@@ -1,0 +1,26 @@
+# Chaves de API — nunca commitar
+.env
+
+# Ambiente virtual Python
+venv/
+
+# Dados locais (áudios, transcrições, banco)
+data/
+
+# Configurações de usuário (pasta de notas escolhida)
+storage/settings.json
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Claude Code
+.claude/

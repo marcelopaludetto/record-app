@@ -1,0 +1,28 @@
+# Interface
+PyQt6>=6.6.0
+
+# Áudio
+sounddevice>=0.4.6
+pyaudio>=0.2.14
+
+# Templates e documentos
+Jinja2>=3.1.0
+
+# NumPy (dependência do sounddevice)
+numpy>=1.24.0
+
+# Detecção de janelas (Windows)
+pywin32>=306
+
+# APIs
+groq>=0.4.0
+anthropic>=0.20.0
+
+# Loopback de áudio (WASAPI)
+pyaudiowpatch
+
+# Variáveis de ambiente
+python-dotenv
+
+# Renderização de markdown no chat
+markdown

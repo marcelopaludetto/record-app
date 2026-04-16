@@ -1,0 +1,36 @@
+---
+titulo: "{{ title }}"
+date: {{ date_iso }}
+started_at: "{{ started_at_iso }}"
+ended_at: "{{ ended_at_iso }}"
+tipo_agenda: "{{ tipo_agenda }}"
+duration: "{{ duration }}"
+tags:
+{% for tema in temas %}  - {{ tema }}
+{% endfor %}---
+
+# {{ title }}
+
+{{ date_str }}
+
+---
+{% if tldr %}
+### TLDR
+{% for item in tldr %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+{% for topic in topics %}
+
+### {{ topic.title }}
+{% for bullet in topic.bullets %}
+- {{ bullet.text }}
+{% endfor %}
+{% endfor %}
+{% if next_steps %}
+
+### Próximos Passos
+{% for step in next_steps %}
+- {{ step.action }}
+{% endfor %}
+{% endif %}
