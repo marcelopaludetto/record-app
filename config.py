@@ -11,7 +11,7 @@ AUDIO_DIR = DATA_DIR / "audio"
 TRANSCRIPTIONS_DIR = DATA_DIR / "transcriptions"
 TEMPLATES_DIR = BASE_DIR / "templates"
 DB_PATH = DATA_DIR / "meetings.db"
-_NOTES_DIR_DEFAULT = Path(r"C:\Users\Marcelo\Documents\Notes")
+_NOTES_DIR_DEFAULT = Path(os.getenv("NOTES_DIR", "")) or Path.home() / "Documents" / "Notes"
 
 # Carrega NOTES_DIR do settings.json se o usuário tiver alterado
 from storage.settings import get_notes_dir as _get_notes_dir
