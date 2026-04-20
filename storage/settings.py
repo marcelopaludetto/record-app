@@ -30,3 +30,13 @@ def save_notes_dir(path: Path):
     data = _load()
     data["notes_dir"] = str(path)
     _save(data)
+
+
+def get_last_profile() -> str:
+    return _load().get("last_profile", "trabalho")
+
+
+def save_last_profile(profile: str):
+    data = _load()
+    data["last_profile"] = profile
+    _save(data)

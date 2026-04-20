@@ -50,7 +50,7 @@ def _make_bubble(text: str, is_user: bool) -> QWidget:
     wrapper_layout = QHBoxLayout(wrapper)
     wrapper_layout.setContentsMargins(8, 4, 8, 4)
 
-    font = QFont("Segoe UI", 10)
+    font = QFont("Segoe UI", 13)
 
     if is_user:
         bubble = QLabel(text)

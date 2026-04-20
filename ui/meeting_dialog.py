@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from core.recorder import AudioRecorder
+from storage.settings import get_last_profile, save_last_profile
 
 
 PROFILE_OPTIONS = [
@@ -24,6 +25,7 @@ class NewMeetingDialog(QDialog):
         self._controller = controller
         self.setWindowTitle("Nova Reunião")
         self.setMinimumWidth(420)
+        self._last_profile = get_last_profile()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -42,9 +44,9 @@ class NewMeetingDialog(QDialog):
         self._profile_group = QButtonGroup(self)
         radio_layout = QHBoxLayout()
         radio_layout.setSpacing(16)
-        for i, (label, _) in enumerate(PROFILE_OPTIONS):
+        for i, (label, value) in enumerate(PROFILE_OPTIONS):
             rb = QRadioButton(label)
-            if i == 0:
+            if value == self._last_profile:
                 rb.setChecked(True)
             self._profile_group.addButton(rb, i)
             radio_layout.addWidget(rb)
@@ -96,7 +98,9 @@ class NewMeetingDialog(QDialog):
 
     def get_profile(self) -> str:
         idx = self._profile_group.checkedId()
-        return PROFILE_OPTIONS[idx][1]
+        profile = PROFILE_OPTIONS[idx][1]
+        save_last_profile(profile)
+        return profile
 
     def _get_mic_name(self, device_index) -> str:
         try:
