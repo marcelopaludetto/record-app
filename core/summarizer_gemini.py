@@ -6,7 +6,7 @@ import time
 import httpx
 
 from config import GEMINI_API_KEY
-from core.summarizer import SYSTEM_PROMPT, USER_TEMPLATE
+from core.prompts import PROFILES, USER_TEMPLATE
 from core.summarizer import Summarizer as _BaseSummarizer
 
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -25,15 +25,16 @@ class GeminiSummarizer(_BaseSummarizer):
     def is_available(self) -> bool:
         return bool(GEMINI_API_KEY.strip())
 
-    def summarize(self, transcript: str) -> dict:
+    def summarize(self, transcript: str, profile: str = "trabalho") -> dict:
+        system_prompt = PROFILES.get(profile, PROFILES["trabalho"])
         prompt = USER_TEMPLATE.format(transcript=transcript[:800000])
         payload = {
-            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "system_instruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3},
+            "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
         }
         retries = 3
-        delay = 10  # segundos
+        delay = 10
         for attempt in range(retries):
             response = httpx.post(GEMINI_URL, json=payload, timeout=180.0)
             if response.status_code == 503 and attempt < retries - 1:

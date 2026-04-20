@@ -33,7 +33,7 @@ class MeetingController:
     # Gravação
     # ------------------------------------------------------------------
 
-    def start_meeting(self, title: str):
+    def start_meeting(self, title: str, profile: str = "trabalho"):
         if self._current and self._recorder.is_recording:
             raise RuntimeError("Já existe uma reunião em andamento.")
         if not self._loopback_ready:
@@ -43,10 +43,10 @@ class MeetingController:
                 loopback_idx = default["index"] if default else None
             self._recorder = AudioRecorder(mic_device=MIC_DEVICE_INDEX, loopback_device=loopback_idx)
             self._loopback_ready = True
-        self._current = Meeting(title=title, started_at=datetime.now())
+        self._current = Meeting(title=title, started_at=datetime.now(), profile=profile)
         self._recorder.start()
 
-    def import_txt(self, txt_path: Path, title: str):
+    def import_txt(self, txt_path: Path, title: str, profile: str = "trabalho"):
         """Carrega um .txt ou .vtt de transcrição existente e prepara para sumarização."""
         if self._current and self._recorder.is_recording:
             raise RuntimeError("Já existe uma reunião em andamento.")
@@ -58,13 +58,13 @@ class MeetingController:
             pass
         raw = txt_path.read_text(encoding="utf-8")
         transcript = _parse_vtt(raw) if txt_path.suffix.lower() == ".vtt" else raw
-        self._current = Meeting(title=title, started_at=started_at)
+        self._current = Meeting(title=title, started_at=started_at, profile=profile)
         self._current.transcript_text = transcript
         self._current.transcript_path = txt_path
         self._current.ended_at = started_at
         self._current.status = "summarizing"
 
-    def import_audio(self, audio_path: Path, title: str):
+    def import_audio(self, audio_path: Path, title: str, profile: str = "trabalho"):
         """Carrega um arquivo de áudio existente como reunião atual, sem gravar."""
         if self._current and self._recorder.is_recording:
             raise RuntimeError("Já existe uma reunião em andamento.")
@@ -75,7 +75,7 @@ class MeetingController:
             started_at = datetime.strptime(f"{parts[0]}_{parts[1]}", "%Y-%m-%d_%H-%M")
         except (IndexError, ValueError):
             pass
-        self._current = Meeting(title=title, started_at=started_at)
+        self._current = Meeting(title=title, started_at=started_at, profile=profile)
         self._current.audio_path = audio_path
         self._current.ended_at = started_at
         self._current.status = "transcribing"
@@ -107,7 +107,7 @@ class MeetingController:
             raise RuntimeError("Sem transcrição para sumarizar.")
 
         plain = _plain_from_transcript(self._current.transcript_text)
-        result = self._summarizer.summarize(plain)
+        result = self._summarizer.summarize(plain, self._current.profile)
 
         self._current.topics = [
             Topic(

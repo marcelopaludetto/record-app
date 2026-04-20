@@ -41,6 +41,7 @@ class Meeting:
     tipo_agenda: str = ""           # 1on1 | com cliente | followup | time todo
     temas: list[str] = field(default_factory=list)  # tags temáticas da reunião
     entities: list[dict] = field(default_factory=list)  # [{"name": "Alana", "type": "person"}, ...]
+    profile: str = "trabalho"  # "trabalho" | "terapia"
 
     @property
     def duration_seconds(self) -> int:

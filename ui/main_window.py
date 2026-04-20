@@ -194,12 +194,13 @@ class MainWindow(QMainWindow):
             return
 
         title = dlg.get_title()
+        profile = dlg.get_profile()
 
         if not title:
             return
 
         try:
-            self._controller.start_meeting(title)
+            self._controller.start_meeting(title, profile)
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))
             return
@@ -311,8 +312,15 @@ class MainWindow(QMainWindow):
         if not ok or not title.strip():
             return
 
+        profile_label, ok2 = QInputDialog.getItem(
+            self, "Tipo de registro", "Tipo:", ["Trabalho", "Terapia"], 0, False
+        )
+        if not ok2:
+            return
+        profile = "terapia" if profile_label == "Terapia" else "trabalho"
+
         try:
-            self._controller.import_audio(audio_path, title.strip())
+            self._controller.import_audio(audio_path, title.strip(), profile)
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))
             return
@@ -352,8 +360,15 @@ class MainWindow(QMainWindow):
         if not ok or not title.strip():
             return
 
+        profile_label, ok2 = QInputDialog.getItem(
+            self, "Tipo de registro", "Tipo:", ["Trabalho", "Terapia"], 0, False
+        )
+        if not ok2:
+            return
+        profile = "terapia" if profile_label == "Terapia" else "trabalho"
+
         try:
-            self._controller.import_txt(txt_path, title.strip())
+            self._controller.import_txt(txt_path, title.strip(), profile)
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))
             return

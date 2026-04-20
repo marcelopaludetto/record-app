@@ -48,7 +48,9 @@ class DocumentExporter:
         )
 
         filename = _make_filename(meeting)
-        output_path = self.output_dir / filename
+        out_dir = self.output_dir / "terapia" if getattr(meeting, "profile", "trabalho") == "terapia" else self.output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output_path = out_dir / filename
         output_path.write_text(content, encoding="utf-8")
         return output_path
 

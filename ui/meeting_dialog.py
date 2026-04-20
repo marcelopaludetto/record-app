@@ -1,14 +1,21 @@
 """
-Diálogo de Nova Reunião — título e dispositivos de áudio.
+Diálogo de Nova Reunião — título, perfil e dispositivos de áudio.
 """
 import datetime
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QDialogButtonBox, QGroupBox,
+    QHBoxLayout, QRadioButton, QButtonGroup,
 )
 from PyQt6.QtCore import Qt
 
 from core.recorder import AudioRecorder
+
+
+PROFILE_OPTIONS = [
+    ("Trabalho",  "trabalho"),
+    ("Terapia",   "terapia"),
+]
 
 
 class NewMeetingDialog(QDialog):
@@ -23,13 +30,27 @@ class NewMeetingDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
-        # --- Título ---
+        # --- Título e Perfil ---
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
         default_title = "Reunião " + datetime.datetime.now().strftime("%d/%m %H:%M")
         self._title_input = QLineEdit(default_title)
         self._title_input.selectAll()
         form.addRow("Título:", self._title_input)
+
+        self._profile_group = QButtonGroup(self)
+        radio_layout = QHBoxLayout()
+        radio_layout.setSpacing(16)
+        for i, (label, _) in enumerate(PROFILE_OPTIONS):
+            rb = QRadioButton(label)
+            if i == 0:
+                rb.setChecked(True)
+            self._profile_group.addButton(rb, i)
+            radio_layout.addWidget(rb)
+        radio_layout.addStretch()
+        form.addRow("Tipo:", radio_layout)
+
         layout.addLayout(form)
 
         # --- Dispositivos ---
@@ -40,11 +61,18 @@ class NewMeetingDialog(QDialog):
         mic_name = self._get_mic_name(rec.mic_device)
         devices_layout.addWidget(QLabel(f"🎤 Microfone: {mic_name}"))
 
+        loopback_name = None
         if rec.loopback_device is not None:
             lb_list = AudioRecorder.list_loopback_devices()
             lb_info = next((d for d in lb_list if d["index"] == rec.loopback_device), None)
-            lb_name = lb_info["name"] if lb_info else str(rec.loopback_device)
-            lbl = QLabel(f"🔊 Sistema (loopback): {lb_name}")
+            loopback_name = lb_info["name"] if lb_info else str(rec.loopback_device)
+        else:
+            default = AudioRecorder.get_default_loopback()
+            if default:
+                loopback_name = default["name"]
+
+        if loopback_name:
+            lbl = QLabel(f"🔊 Sistema (loopback): {loopback_name}")
             lbl.setStyleSheet("color: #a6e3a1;")
         else:
             lbl = QLabel("🔊 Sistema (loopback): não disponível")
@@ -65,6 +93,10 @@ class NewMeetingDialog(QDialog):
 
     def get_title(self) -> str:
         return self._title_input.text().strip()
+
+    def get_profile(self) -> str:
+        idx = self._profile_group.checkedId()
+        return PROFILE_OPTIONS[idx][1]
 
     def _get_mic_name(self, device_index) -> str:
         try:
