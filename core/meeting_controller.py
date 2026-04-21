@@ -107,7 +107,19 @@ class MeetingController:
             raise RuntimeError("Sem transcrição para sumarizar.")
 
         plain = _plain_from_transcript(self._current.transcript_text)
-        result = self._summarizer.summarize(plain, self._current.profile)
+        try:
+            result = self._summarizer.summarize(plain, self._current.profile)
+        except Exception as primary_exc:
+            # Fallback: se Gemini falhar (503, timeout, etc), tenta Claude automaticamente.
+            fallback = self._build_fallback_summarizer()
+            if fallback is None:
+                raise
+            self._fallback_reason = f"{self._summarizer.backend} falhou ({primary_exc}). Usando {fallback.backend}."
+            result = fallback.summarize(plain, self._current.profile)
+            self._summarizer_used = fallback
+        else:
+            self._fallback_reason = None
+            self._summarizer_used = self._summarizer
 
         self._current.topics = [
             Topic(
@@ -183,6 +195,25 @@ class MeetingController:
 
     def is_ollama_available(self) -> bool:
         return self._summarizer.is_available()
+
+    def _build_fallback_summarizer(self):
+        """Retorna um summarizer alternativo disponível (backend diferente do atual)."""
+        current_backend = self._summarizer.backend
+        if current_backend == "gemini":
+            claude = Summarizer()
+            if claude.is_available():
+                return claude
+        elif current_backend == "claude":
+            gemini = GeminiSummarizer()
+            if gemini.is_available():
+                return gemini
+        return None
+
+    def consume_fallback_notice(self) -> str | None:
+        """Retorna (e limpa) mensagem do último fallback, se houve."""
+        msg = getattr(self, "_fallback_reason", None)
+        self._fallback_reason = None
+        return msg
 
     def is_recording(self) -> bool:
         return self._recorder.is_recording

@@ -214,6 +214,20 @@ class AudioRecorder:
 
         return output_path
 
+    def get_mixed_audio(self) -> np.ndarray:
+        """Snapshot mono int16 do áudio capturado até agora (mic + loopback mixados).
+        Thread-safe — para uso do transcritor ao vivo sem interferir na gravação.
+        """
+        with self._lock:
+            if not self._mic_frames:
+                return np.array([], dtype=np.int16)
+            mic = np.concatenate(self._mic_frames, axis=0).flatten()
+            loop = (
+                np.concatenate(self._loopback_frames, axis=0).flatten()
+                if self._loopback_frames else None
+            )
+        return _mix_audio(mic, loop, self._loopback_rate, self.sample_rate)
+
     @property
     def recorded_seconds(self) -> float:
         with self._lock:

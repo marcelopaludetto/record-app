@@ -1,7 +1,6 @@
 """
 Diálogo de Nova Reunião — título, perfil e dispositivos de áudio.
 """
-import datetime
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QDialogButtonBox, QGroupBox,
@@ -36,9 +35,8 @@ class NewMeetingDialog(QDialog):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-        default_title = "Reunião " + datetime.datetime.now().strftime("%d/%m %H:%M")
-        self._title_input = QLineEdit(default_title)
-        self._title_input.selectAll()
+        self._title_input = QLineEdit()
+        self._title_input.setPlaceholderText("Ex: 1:1 com Alana")
         form.addRow("Título:", self._title_input)
 
         self._profile_group = QButtonGroup(self)

@@ -45,7 +45,6 @@ class TxtProcessingWorker(QThread):
 
 class ProcessingWorker(QThread):
     progress = pyqtSignal(str, int)   # (mensagem, percentual 0-100)
-    segment_text = pyqtSignal(str)    # texto de cada segmento transcrito
     finished = pyqtSignal(str)        # caminho do .md gerado
     error = pyqtSignal(str)
 
@@ -95,8 +94,6 @@ class ProcessingWorker(QThread):
                             self.progress.emit(f"Transcrevendo... {pct}%", scaled)
                         except ValueError:
                             pass
-                    elif line.startswith("TEXT:"):
-                        self.segment_text.emit(line[5:])
 
             stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
             stderr_thread.start()

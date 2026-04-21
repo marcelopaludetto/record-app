@@ -7,13 +7,14 @@ from PyQt6.QtWidgets import (
     QStatusBar, QMessageBox, QPlainTextEdit,
     QSystemTrayIcon, QMenu, QFileDialog, QComboBox, QFrame,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont, QIcon, QAction, QCloseEvent
 
 import config
 from config import APP_NAME, APP_VERSION
 from storage.settings import save_notes_dir, get_last_profile, save_last_profile
 from core.meeting_controller import MeetingController
+from core.live_transcriber import LiveTranscriber
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
 from ui.import_dialog import ImportDialog
@@ -26,6 +27,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._controller = MeetingController()
         self._worker: ProcessingWorker | None = None
+        self._live_transcriber: LiveTranscriber | None = None
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._update_timer)
@@ -72,6 +74,14 @@ class MainWindow(QMainWindow):
         self._label_status.setObjectName("status_label")
         header.addWidget(self._label_status, stretch=1)
 
+        self._combo_backend = QComboBox()
+        self._combo_backend.addItems(["claude", "gemini"])
+        self._combo_backend.setCurrentText(config.SUMMARIZER_BACKEND)
+        self._combo_backend.setFixedWidth(82)
+        self._combo_backend.setFixedHeight(24)
+        self._combo_backend.currentTextChanged.connect(self._on_backend_changed)
+        header.addWidget(self._combo_backend)
+
         self._label_api = QLabel()
         self._label_api.setObjectName("api_pill")
         self._label_api.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -115,13 +125,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._progress_bar)
         layout.addSpacing(12)
 
-        # ── Transcrição progressiva ───────────────────────────────────
-        self._transcript_view = QPlainTextEdit()
-        self._transcript_view.setObjectName("transcript_view")
-        self._transcript_view.setReadOnly(True)
-        self._transcript_view.setPlaceholderText("Os segmentos transcritos aparecerão aqui...")
-        self._transcript_view.hide()
-        layout.addWidget(self._transcript_view, stretch=1)
+        # ── Transcrição ao vivo (durante a gravação) ──────────────────
+        self._live_view = QPlainTextEdit()
+        self._live_view.setObjectName("live_view")
+        self._live_view.setReadOnly(True)
+        self._live_view.setPlaceholderText("Transcrição ao vivo aparecerá aqui durante a gravação...")
+        self._live_view.hide()
+        layout.addWidget(self._live_view, stretch=1)
 
         layout.addStretch()
 
@@ -185,20 +195,6 @@ class MainWindow(QMainWindow):
         btn_change_dir.clicked.connect(self._on_change_notes_dir)
         footer.addWidget(btn_change_dir)
 
-        footer.addSpacing(16)
-
-        lbl_backend = QLabel("Sumarização:")
-        lbl_backend.setObjectName("footer_label")
-        footer.addWidget(lbl_backend)
-
-        self._combo_backend = QComboBox()
-        self._combo_backend.addItems(["claude", "gemini"])
-        self._combo_backend.setCurrentText(config.SUMMARIZER_BACKEND)
-        self._combo_backend.setFixedWidth(90)
-        self._combo_backend.setFixedHeight(26)
-        self._combo_backend.currentTextChanged.connect(self._on_backend_changed)
-        footer.addWidget(self._combo_backend)
-
         layout.addLayout(footer)
 
         return tab
@@ -232,7 +228,7 @@ class MainWindow(QMainWindow):
         self._label_progress.setVisible(show_progress)
         self._progress_bar.setVisible(show_progress)
 
-        self._transcript_view.setVisible(processing or done)
+        self._live_view.setVisible(recording)
 
     # ------------------------------------------------------------------
     # Slots — Gravação
@@ -267,9 +263,21 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"Gravação em andamento: {title}")
         self._set_state("recording")
 
+        # Transcrição ao vivo em paralelo (não interfere com a gravação)
+        self._live_view.clear()
+        self._live_transcriber = LiveTranscriber(self._controller._recorder)
+        self._live_transcriber.segment.connect(self._on_live_segment)
+        self._live_transcriber.start()
+
     @pyqtSlot()
     def _on_stop(self):
         self._timer.stop()
+
+        if self._live_transcriber:
+            self._live_transcriber.stop()
+            self._live_transcriber.wait(2000)
+            self._live_transcriber = None
+
         self._label_status.setText("Processando...")
         self._set_state("processing")
 
@@ -283,12 +291,10 @@ class MainWindow(QMainWindow):
 
         self._progress_bar.setValue(0)
         self._label_progress.setText("Iniciando processamento...")
-        self._transcript_view.clear()
         self._status_bar.showMessage("Transcrevendo e gerando resumo...")
 
         self._worker = ProcessingWorker(self._controller)
         self._worker.progress.connect(self._on_progress)
-        self._worker.segment_text.connect(self._on_segment_text)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -328,13 +334,11 @@ class MainWindow(QMainWindow):
         self._label_status.setText(f"⏳  Processando: {title}")
         self._label_progress.setText("Iniciando transcrição...")
         self._progress_bar.setValue(0)
-        self._transcript_view.clear()
         self._status_bar.showMessage(f"Importando áudio: {audio_path.name}")
         self._set_state("processing")
 
         self._worker = ProcessingWorker(self._controller)
         self._worker.progress.connect(self._on_progress)
-        self._worker.segment_text.connect(self._on_segment_text)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -390,19 +394,24 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(message)
 
     @pyqtSlot(str)
-    def _on_segment_text(self, text: str):
-        self._transcript_view.appendPlainText(text)
-        self._transcript_view.verticalScrollBar().setValue(
-            self._transcript_view.verticalScrollBar().maximum()
-        )
+    def _on_live_segment(self, text: str):
+        self._live_view.appendPlainText(text)
+        sb = self._live_view.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
     @pyqtSlot(str)
     def _on_finished(self, path: str):
         filename = Path(path).name
-        self._label_status.setText(f"✅  Salvo: {filename}")
-        self._label_progress.setText("Documento gerado com sucesso!")
+        fallback = self._controller.consume_fallback_notice()
+        if fallback:
+            self._label_status.setText(f"✅  Salvo (fallback): {filename}")
+            self._label_progress.setText(f"⚠️ {fallback}")
+            self._status_bar.showMessage(f"Concluído com fallback: {fallback}")
+        else:
+            self._label_status.setText(f"✅  Salvo: {filename}")
+            self._label_progress.setText("Documento gerado com sucesso!")
+            self._status_bar.showMessage(f"Concluído: {path}")
         self._progress_bar.setValue(100)
-        self._status_bar.showMessage(f"Concluído: {path}")
         self._tray.setIcon(make_tray_icon(recording=False))
         self._tray.setToolTip(APP_NAME)
         self._set_state("done")
@@ -516,17 +525,37 @@ class MainWindow(QMainWindow):
     def _check_api(self):
         summarizer = self._controller._summarizer
         backend    = summarizer.backend
-        available  = summarizer.is_available()
 
-        if backend == "gemini" and available:
-            self._label_api.setText("🟢 Gemini 2.5 Flash")
-            self._label_api.setStyleSheet("color: #a6e3a1; font-size: 12px;")
-        elif backend == "claude" and available:
+        if not summarizer.is_available():
+            self._label_api.setText("🔴 Chave API ausente")
+            self._label_api.setStyleSheet("color: #f38ba8; font-size: 12px;")
+            return
+
+        if backend == "claude":
             from config import ANTHROPIC_MODEL
             self._label_api.setText(f"🟢 {ANTHROPIC_MODEL}")
             self._label_api.setStyleSheet("color: #a6e3a1; font-size: 12px;")
+            return
+
+        # Gemini: ping real em background
+        self._label_api.setText("🟡 Verificando Gemini...")
+        self._label_api.setStyleSheet("color: #f9e2af; font-size: 12px;")
+        self._gemini_ping_thread = _GeminiPingThread(summarizer)
+        self._gemini_ping_thread.result.connect(self._on_gemini_ping_result)
+        self._gemini_ping_thread.start()
+
+    @pyqtSlot(bool, str)
+    def _on_gemini_ping_result(self, ok: bool, message: str):
+        if ok:
+            self._label_api.setText("🟢 Gemini alcançável")
+            self._label_api.setToolTip(
+                "Endpoint /models respondeu OK. O generateContent pode ainda "
+                "retornar 503 — nesse caso há fallback automático para Claude."
+            )
+            self._label_api.setStyleSheet("color: #a6e3a1; font-size: 12px;")
         else:
-            self._label_api.setText("🔴 Chave API ausente")
+            self._label_api.setText(f"🔴 Gemini — {message}")
+            self._label_api.setToolTip("")
             self._label_api.setStyleSheet("color: #f38ba8; font-size: 12px;")
 
     def _update_notes_dir_label(self):
@@ -555,3 +584,15 @@ class MainWindow(QMainWindow):
         import urllib.parse
         encoded = urllib.parse.quote(str(self._notes_dir), safe="")
         subprocess.Popen(["start", f"obsidian://open?path={encoded}"], shell=True)
+
+
+class _GeminiPingThread(QThread):
+    result = pyqtSignal(bool, str)
+
+    def __init__(self, summarizer):
+        super().__init__()
+        self._summarizer = summarizer
+
+    def run(self):
+        ok, msg = self._summarizer.ping()
+        self.result.emit(ok, msg)
