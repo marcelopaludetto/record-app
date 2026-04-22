@@ -86,7 +86,8 @@ class HistoryWidget(QWidget):
         for m in meetings:
             date_str     = m.started_at.strftime("%d/%m/%Y %H:%M")
             status_icon  = {"done": "✅", "error": "❌", "recording": "⏺"}.get(m.status, "⏳")
-            profile_tag  = "  [terapia]" if getattr(m, "profile", "") == "terapia" else ""
+            profile      = getattr(m, "profile", "")
+            profile_tag  = f"  [{profile}]" if profile in ("terapia", "curso") else ""
             item = QListWidgetItem(f"{status_icon}  {date_str}{profile_tag}\n   {m.title}")
             item.setData(Qt.ItemDataRole.UserRole, m.id)
             self._list.addItem(item)

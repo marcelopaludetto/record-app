@@ -15,6 +15,7 @@ from storage.settings import get_last_profile, save_last_profile
 PROFILE_OPTIONS = [
     ("Trabalho",  "trabalho"),
     ("Terapia",   "terapia"),
+    ("Curso",     "curso"),
 ]
 
 
