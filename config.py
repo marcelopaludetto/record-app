@@ -52,7 +52,16 @@ NAME_ALIASES: dict[str, str] = {
     "Lis":      "Liz",
     "Isa":      "Isabella",
     "Gi":      "Giovana",
+    "Gil":      "Giulliana",
+    "Giu":      "Giulliana",
+    "Andrea":      "Andreia",
+    "Deia":      "Andreia",
     "Lu":      "Luana",
+    "SeduqST":      "SEDUC-SP",
+    "Lançaduque":      "SEDUC-SP",
+    "Joice":      "Joyce",
+    "FEMINA":      "Gemini",
+    "GFT":      "GPT"
 }
 
 # App
