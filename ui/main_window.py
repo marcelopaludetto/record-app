@@ -14,7 +14,6 @@ import config
 from config import APP_NAME, APP_VERSION
 from storage.settings import save_notes_dir, get_last_profile, save_last_profile
 from core.meeting_controller import MeetingController
-from core.live_transcriber import LiveTranscriber
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
 from ui.import_dialog import ImportDialog
@@ -27,7 +26,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._controller = MeetingController()
         self._worker: ProcessingWorker | None = None
-        self._live_transcriber: LiveTranscriber | None = None
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._update_timer)
@@ -125,14 +123,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._progress_bar)
         layout.addSpacing(12)
 
-        # ── Transcrição ao vivo (durante a gravação) ──────────────────
-        self._live_view = QPlainTextEdit()
-        self._live_view.setObjectName("live_view")
-        self._live_view.setReadOnly(True)
-        self._live_view.setPlaceholderText("Transcrição ao vivo aparecerá aqui durante a gravação...")
-        self._live_view.hide()
-        layout.addWidget(self._live_view, stretch=1)
-
         layout.addStretch()
 
         # ── Separador ─────────────────────────────────────────────────
@@ -228,8 +218,6 @@ class MainWindow(QMainWindow):
         self._label_progress.setVisible(show_progress)
         self._progress_bar.setVisible(show_progress)
 
-        self._live_view.setVisible(recording)
-
     # ------------------------------------------------------------------
     # Slots — Gravação
     # ------------------------------------------------------------------
@@ -263,20 +251,9 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"Gravação em andamento: {title}")
         self._set_state("recording")
 
-        # Transcrição ao vivo em paralelo (não interfere com a gravação)
-        self._live_view.clear()
-        self._live_transcriber = LiveTranscriber(self._controller._recorder)
-        self._live_transcriber.segment.connect(self._on_live_segment)
-        self._live_transcriber.start()
-
     @pyqtSlot()
     def _on_stop(self):
         self._timer.stop()
-
-        if self._live_transcriber:
-            self._live_transcriber.stop()
-            self._live_transcriber.wait(2000)
-            self._live_transcriber = None
 
         self._label_status.setText("Processando...")
         self._set_state("processing")
@@ -392,12 +369,6 @@ class MainWindow(QMainWindow):
         self._label_progress.setText(message)
         self._progress_bar.setValue(value)
         self._status_bar.showMessage(message)
-
-    @pyqtSlot(str)
-    def _on_live_segment(self, text: str):
-        self._live_view.appendPlainText(text)
-        sb = self._live_view.verticalScrollBar()
-        sb.setValue(sb.maximum())
 
     @pyqtSlot(str)
     def _on_finished(self, path: str):
