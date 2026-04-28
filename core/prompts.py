@@ -42,8 +42,9 @@ ORGANIZAÇÃO DE BULLETS:
 - Cada bullet deve ser compreensível sem depender do bullet anterior — evite pronomes sem referente claro ("ele decidiu", "isso foi aprovado")
 
 CLASSIFICAÇÃO (para metadados):
-- tipo_agenda (escolha 1): 1on1 | com cliente | followup | time todo
-- temas (2 a 5 tags curtas em português, minúsculas, descrevendo os assuntos principais da reunião. palavras compostas precisam ter hífen, ex: "duplicação-unidades", "educação-midiática")
+- tipo_agenda (escolha 1): 1on1 | allhands | brainstorm | followup
+- temas (1 a 3 tags, escolha APENAS desta lista fechada): produto | tecnico | curriculo | avaliacao
+  Não invente tags fora desta lista. Se o assunto não se encaixa claramente em nenhuma, escolha o mais próximo.
 
 ENTIDADES (para wikilinks no Obsidian):
 - Retorne um campo "entities": lista de pessoas e projetos mencionados explicitamente nas notas

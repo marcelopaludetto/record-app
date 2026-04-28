@@ -58,6 +58,7 @@ NAME_ALIASES: dict[str, str] = {
     "Deia":      "Andreia",
     "Lu":      "Luana",
     "SeduqST":      "SEDUC-SP",
+    "CEDUC":      "SEDUC",
     "Lançaduque":      "SEDUC-SP",
     "Joice":      "Joyce",
     "FEMINA":      "Gemini",
