@@ -49,15 +49,24 @@ CLASSIFICAÇÃO (para metadados):
 ENTIDADES (para wikilinks no Obsidian):
 - Retorne um campo "entities": lista de pessoas e projetos mencionados explicitamente nas notas
 - Inclua apenas entidades que aparecem no conteúdo dos bullets, next_steps ou tldr
-- type "person" para pessoas, "project" para projetos/iniciativas/produtos/ferramentas
-- Use o nome canônico mais curto (ex: "Alana", não "Alana Silva"; "SEED-PR", não "projeto SEED-PR")
+- type "person": pessoas (colaboradores, stakeholders, professores, clientes nomeados)
+- type "project": APENAS projetos/iniciativas/produtos internos da organização, escolas/secretarias/clientes, programas governamentais, times nomeados (ex: 'SEED-PR', 'SEDUC-SP', 'Trilhas do Futuro', 'Time vermelho', 'MEC', 'Alurona')
+- NÃO inclua como entidade: ferramentas SaaS e plataformas de terceiros (ClickUp, SharePoint, Microsoft Graph, Drive, Gmail, Notion, Slack, Figma, Lovable, ChatGPT, Codex, etc.), siglas técnicas genéricas (HTML, R2, BI, IA, API, PDF), bibliotecas/frameworks, formatos de arquivo. Mencione no texto sem wikilink.
+- Critério de decisão: se o nome merece uma nota dedicada no vault de trabalho do usuário (com histórico, contexto, decisões), é entidade. Se é só uma ferramenta usada de passagem, não é.
+- Use o nome canônico mais curto (ex: 'Alana', não 'Alana Silva'; 'SEED-PR', não 'projeto SEED-PR')
 - Se não houver entidades relevantes, retorne lista vazia
 
+AGENDAMENTOS E COMPROMISSOS (captura obrigatória):
+- Reuniões marcadas, recorrências definidas (dia/hora/frequência), e conexões a fazer com outros times ou pessoas SEMPRE devem aparecer visivelmente — nunca podem se perder no meio de bullets de discussão
+- Inclui: 'vamos marcar com o time X', 'vou puxar uma recorrência com Fulano', 'vou apresentar você ao time Y', 'vamos visitar escola tal', 'recorrência semanal às quartas 11h'
+- Se houver 2+ desses, agrupe num tópico próprio (ex: 'Próximos Encontros e Conexões'). Se houver 1 só, garanta que apareça em next_steps
+- Compromissos pessoais explícitos ('isso fica comigo', 'coloca meu nome no card', 'deixa que eu faço') também entram aqui — são ações com dono nomeado
+
 NEXT_STEPS:
-- Liste APENAS o que ficou pendente, não alinhado, ou precisa ser validado/refinado após a reunião
-- Não repita nada que já apareceu como bullet em qualquer tópico acima
-- Se um próximo passo já foi mencionado num tópico, ele NÃO entra aqui — os next_steps são para o que não coube naturalmente em nenhum tópico
-- Não atribua responsável
+- Liste o que ficou pendente, foi acordado para depois, ou precisa ser validado/refinado após a reunião
+- Inclui obrigatoriamente: reuniões a marcar, recorrências firmadas, conexões a fazer, e compromissos com dono explícito
+- Atribua responsável QUANDO foi dito explicitamente quem assumiu (ex: 'Marcelo: agendar reunião com time vermelho'). Se não foi dito, deixe sem dono
+- Pode repetir um compromisso de ação que já apareceu num tópico — a anti-duplicação vale para fatos/contexto, não para ações que precisam ser executadas
 - Se não há pendências reais, retorne lista vazia
 """
 
