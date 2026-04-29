@@ -51,7 +51,7 @@ ENTIDADES (para wikilinks no Obsidian):
 - Inclua apenas entidades que aparecem no conteúdo dos bullets, next_steps ou tldr
 - type "person": pessoas (colaboradores, stakeholders, professores, clientes nomeados)
 - type "project": APENAS projetos/iniciativas/produtos internos da organização, escolas/secretarias/clientes, programas governamentais, times nomeados (ex: 'SEED-PR', 'SEDUC-SP', 'Trilhas do Futuro', 'Time vermelho', 'MEC', 'Alurona')
-- NÃO inclua como entidade: ferramentas SaaS e plataformas de terceiros (ClickUp, SharePoint, Microsoft Graph, Drive, Gmail, Notion, Slack, Figma, Lovable, ChatGPT, Codex, etc.), siglas técnicas genéricas (HTML, R2, BI, IA, API, PDF), bibliotecas/frameworks, formatos de arquivo. Mencione no texto sem wikilink.
+- NÃO inclua como entidade: ferramentas SaaS e plataformas de terceiros (ClickUp, SharePoint, Microsoft Graph, Drive, Gmail, Notion, Slack, Figma, Lovable, ChatGPT, N8N, Claude, Codex, etc.), siglas técnicas genéricas (HTML, R2, BI, IA, API, PDF), bibliotecas/frameworks, formatos de arquivo. Mencione no texto sem wikilink.
 - Critério de decisão: se o nome merece uma nota dedicada no vault de trabalho do usuário (com histórico, contexto, decisões), é entidade. Se é só uma ferramenta usada de passagem, não é.
 - Use o nome canônico mais curto (ex: 'Alana', não 'Alana Silva'; 'SEED-PR', não 'projeto SEED-PR')
 - Se não houver entidades relevantes, retorne lista vazia
