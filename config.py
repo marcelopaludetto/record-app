@@ -44,25 +44,46 @@ AUDIO_CHANNELS = 1
 MIC_DEVICE_INDEX: int | None = None       # None = microfone padrão
 LOOPBACK_DEVICE_INDEX: int | None = None  # None = detecta automaticamente
 
-# Correções de nomes: como a IA/Whisper escreve → como deve aparecer no Obsidian
-# Chave: variação incorreta (case-insensitive)
-# Valor: forma canônica que será usada no [[wikilink]]
+# Correções de nomes: como a IA/Whisper escreve → como deve aparecer no Obsidian.
+# Chave: variação incorreta (case-insensitive).
+# Valor: forma canônica.
+#   - Padrão: vira [[wikilink]] no Obsidian.
+#   - Sufixo "*" no canônico: só corrige a grafia, SEM wikilink (use para ferramentas
+#     SaaS de terceiros que são apenas correção ortográfica, ex: "Gemini*", "GPT*").
+# Aplicado SEMPRE — independente das entidades retornadas pelo LLM.
 NAME_ALIASES: dict[str, str] = {
-    "Carol":    "Karol",
-    "Lis":      "Liz",
-    "Isa":      "Isabella",
-    "Gi":      "Giovana",
-    "Gil":      "Giulliana",
-    "Giu":      "Giulliana",
-    "Andrea":      "Andreia",
-    "Deia":      "Andreia",
-    "Lu":      "Luana",
-    "SeduqST":      "SEDUC-SP",
-    "CEDUC":      "SEDUC",
-    "Lançaduque":      "SEDUC-SP",
+    "Carol":      "Karol",
+    "Lis":        "Lizandra",
+    "Lisandra":   "Lizandra",
+    "ALisandra":   "Lizandra",
+    "Liz":        "Lizandra",
+    "Gui":        "Guilherme",
+    "Isa":        "Isabella",
+    "Isabela":        "Isabella",
+    "Jay":        "Jane",
+    "Ivy":         "Evellyn",
+    "Eve":         "Evellyn",
+    "Ivi":         "Evellyn",
+    "Evy":       "Evellyn",
+    "Beatriz": "Ana Beatriz",
+    "Evelyn": "Evellyn",
+    "Gi":         "Giovana",
+    "Barreto":    "Gabriel",
+    "Gabs":       "Gabriel",
+    "Andresa":    "Andreza",
+    "Gil":        "Giulliana",
+    "Giu":        "Giulliana",
+    "Andrea":     "Andreia",
+    "Deia":       "Andreia",
+    "Lu":         "Luana",
+    "SeduqST":    "SEDUC-SP",
+    "CEDUC":      "SEDUC-SP",
+    "Lançaduque": "SEDUC-SP",
     "Joice":      "Joyce",
-    "FEMINA":      "Gemini",
-    "GFT":      "GPT"
+    "FEMINA":     "Gemini*",
+    "GFT":        "GPT*",
+    "Gama": "Gamma*",
+    "Alurona": "Alura*"
 }
 
 # App

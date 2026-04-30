@@ -239,34 +239,56 @@ def _normalize_entities(entities: list[dict]) -> list[dict]:
     return result
 
 
+def _parse_canonical(value: str) -> tuple[str, bool]:
+    """Interpreta o valor de NAME_ALIASES.
+    Sufixo "*" no canônico significa: só corrigir grafia, SEM wikilink.
+    Retorna (nome_limpo, deve_wikilinkar).
+    """
+    if value.endswith("*"):
+        return value[:-1], False
+    return value, True
+
+
 def _canonical_name(name: str) -> str:
-    """Retorna o nome canônico para um dado nome (case-insensitive)."""
-    for alias, canonical in NAME_ALIASES.items():
+    """Retorna o nome canônico (sem sufixo) para um dado alias (case-insensitive)."""
+    for alias, raw_canonical in NAME_ALIASES.items():
         if alias.lower() == name.lower():
-            return canonical
+            return _parse_canonical(raw_canonical)[0]
     return name
 
 
 def _apply_wikilinks(text: str, entities: list[dict]) -> str:
     """Envolve nomes de pessoas e projetos em [[wikilinks]] do Obsidian.
-    Para cada entidade, busca também variações definidas em NAME_ALIASES.
-    """
-    # Mapa reverso: canônico → [aliases que apontam para ele]
-    reverse: dict[str, list[str]] = {}
-    for alias, canonical in NAME_ALIASES.items():
-        reverse.setdefault(canonical, []).append(alias)
 
+    Duas passadas:
+    1. NAME_ALIASES — sempre aplicado, independente do que o LLM retornou.
+       Canônicos com sufixo "*" recebem apenas correção ortográfica (sem [[...]]).
+    2. Entidades retornadas pelo LLM que não estão em NAME_ALIASES.
+    """
+    # Mapa reverso: canônico_limpo → (deve_wikilinkar, [aliases])
+    reverse: dict[str, tuple[bool, list[str]]] = {}
+    for alias, raw_canonical in NAME_ALIASES.items():
+        canonical, wikilink = _parse_canonical(raw_canonical)
+        if canonical not in reverse:
+            reverse[canonical] = (wikilink, [])
+        reverse[canonical][1].append(alias)
+
+    # Pass 1: aplica todos os aliases (sempre)
+    for canonical, (wikilink, aliases) in reverse.items():
+        terms = sorted([canonical] + aliases, key=len, reverse=True)
+        replacement = f'[[{canonical}]]' if wikilink else canonical
+        for term in terms:
+            pattern = rf'(?<!\[)\b{re.escape(term)}\b(?!\])'
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+    # Pass 2: entidades do LLM que não estão cobertas por NAME_ALIASES
     sorted_entities = sorted(entities, key=lambda e: len(e["name"]), reverse=True)
     for entity in sorted_entities:
         canonical = entity["name"]
-        # Busca a forma canônica + todas as variações incorretas no texto
-        search_terms = sorted(
-            [canonical] + reverse.get(canonical, []),
-            key=len, reverse=True,
-        )
-        for term in search_terms:
-            pattern = rf'(?<!\[)\b{re.escape(term)}\b(?!\])'
-            text = re.sub(pattern, f'[[{canonical}]]', text, flags=re.IGNORECASE)
+        if canonical in reverse:
+            continue
+        pattern = rf'(?<!\[)\b{re.escape(canonical)}\b(?!\])'
+        text = re.sub(pattern, f'[[{canonical}]]', text, flags=re.IGNORECASE)
     return text
 
 
