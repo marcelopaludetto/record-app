@@ -1,0 +1,8 @@
+{
+  "whisper_prompt": "Transcrição de reuniões em português do Brasil. Podem aparecer estes termos e grafias: Nome Pessoa, Projeto Interno, Cliente Exemplo, ferramenta específica.",
+  "name_aliases": {
+    "Apelido": "Nome Canônico",
+    "Grafia errada": "Grafia correta",
+    "Ferramenta confundida": "Ferramenta correta*"
+  }
+}

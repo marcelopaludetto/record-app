@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ AUDIO_DIR = DATA_DIR / "audio"
 TRANSCRIPTIONS_DIR = DATA_DIR / "transcriptions"
 TEMPLATES_DIR = BASE_DIR / "templates"
 DB_PATH = DATA_DIR / "meetings.db"
+PERSONAL_TERMS_PATH = BASE_DIR / "personal_terms.json"
 _NOTES_DIR_DEFAULT = Path(os.getenv("NOTES_DIR", "")) or Path.home() / "Documents" / "Notes"
 
 # Carrega settings.json se o usuário tiver alterado configurações pela UI
@@ -25,16 +27,17 @@ for _dir in [AUDIO_DIR, TRANSCRIPTIONS_DIR, NOTES_DIR]:
 GROQ_API_KEY       = os.getenv("GROQ_API_KEY", "")
 GROQ_WHISPER_MODEL = "whisper-large-v3-turbo"  # whisper-large-v3-turbo | whisper-large-v3 | distil-whisper-large-v3-en
 WHISPER_LANGUAGE   = "pt"
+_PERSONAL_TERMS = {}
+if PERSONAL_TERMS_PATH.exists():
+    try:
+        _PERSONAL_TERMS = json.loads(PERSONAL_TERMS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        _PERSONAL_TERMS = {}
+
 # Contexto enviado ao Whisper/Groq para orientar idioma, grafias e termos recorrentes.
-# Isto é uma dica de transcrição, não uma regra rígida. Correções garantidas ficam em
-# NAME_ALIASES, que é aplicado depois da transcrição.
-WHISPER_PROMPT     = (
-    "Transcrição de reuniões em português do Brasil sobre educação, tecnologia e projetos da Alura. "
-    "Podem aparecer estes termos e grafias: Alura, Alura Start, EFAF, EFAI, EM, SEDUC-SP, Forms, "
-    "ClickUp, sprint, roadmap, Marcelo, Daiane, Jéssica, Andreia, Ana Beatriz, Evellyn, Lizandra, "
-    "Guilherme, Isabella, Jane, Giovana, Giulliana, Luana, Joyce, Karol, Gabriel, Deia, Bina, Eve, "
-    "Clari e Lu."
-)
+# Isto é uma dica de transcrição, não uma regra rígida. Configure termos pessoais em
+# personal_terms.json, que fica fora do Git.
+WHISPER_PROMPT = str(_PERSONAL_TERMS.get("whisper_prompt", ""))
 
 # Sumarização via Anthropic Claude / Google Gemini / DeepSeek
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -62,38 +65,8 @@ LOOPBACK_DEVICE_INDEX: int | None = None  # None = detecta automaticamente
 #     SaaS de terceiros que são apenas correção ortográfica, ex: "Gemini*", "GPT*").
 # Aplicado SEMPRE — independente das entidades retornadas pelo LLM.
 NAME_ALIASES: dict[str, str] = {
-    "Carol":      "Karol",
-    "Lis":        "Lizandra",
-    "Lisandra":   "Lizandra",
-    "ALisandra":   "Lizandra",
-    "Liz":        "Lizandra",
-    "Gui":        "Guilherme",
-    "Isa":        "Isabella",
-    "Isabela":        "Isabella",
-    "Jay":        "Jane",
-    "Ivy":         "Evellyn",
-    "Eve":         "Evellyn",
-    "Ivi":         "Evellyn",
-    "Evy":       "Evellyn",
-    "Beatriz": "Ana Beatriz",
-    "Evelyn": "Evellyn",
-    "Gi":         "Giovana",
-    "Barreto":    "Gabriel",
-    "Gabs":       "Gabriel",
-    "Andresa":    "Andreza",
-    "Gil":        "Giulliana",
-    "Giu":        "Giulliana",
-    "Andrea":     "Andreia",
-    "Deia":       "Andreia",
-    "Lu":         "Luana",
-    "SeduqST":    "SEDUC-SP",
-    "CEDUC":      "SEDUC-SP",
-    "Lançaduque": "SEDUC-SP",
-    "Joice":      "Joyce",
-    "FEMINA":     "Gemini*",
-    "GFT":        "GPT*",
-    "Gama": "Gamma*",
-    "Alurona": "Alura*"
+    str(alias): str(canonical)
+    for alias, canonical in (_PERSONAL_TERMS.get("name_aliases") or {}).items()
 }
 
 # App

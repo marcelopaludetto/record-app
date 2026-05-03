@@ -59,6 +59,12 @@ Onde obter cada chave:
 
 > O backend inicial é definido por `SUMMARIZER_BACKEND`: `claude`, `gemini` ou `deepseek`. A escolha feita no app fica salva em `settings.json`.
 
+### 3.1. Configure termos pessoais de transcrição
+
+Termos sensíveis como nomes, apelidos, clientes e correções de grafia ficam em `personal_terms.json`, que é ignorado pelo Git.
+
+Use `personal_terms.example.json` como referência de formato.
+
 ### 4. Inicie o app
 
 Dê duplo clique em **`run.bat`**.
