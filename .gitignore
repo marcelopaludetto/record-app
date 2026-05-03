@@ -1,5 +1,7 @@
 # Chaves de API — nunca commitar
 .env
+.env.*
+!.env.example
 
 # Ambiente virtual Python
 venv/
@@ -7,8 +9,8 @@ venv/
 # Dados locais (áudios, transcrições, banco)
 data/
 
-# Configurações de usuário (pasta de notas escolhida)
-storage/settings.json
+# Configurações de usuário (pasta de notas escolhida, backend etc.)
+settings.json
 
 # Cache Python
 __pycache__/

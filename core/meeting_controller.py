@@ -2,9 +2,10 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from config import AUDIO_DIR, ANTHROPIC_MODEL, MIC_DEVICE_INDEX, LOOPBACK_DEVICE_INDEX, SUMMARIZER_BACKEND, NOTES_DIR, NAME_ALIASES
+from config import AUDIO_DIR, MIC_DEVICE_INDEX, LOOPBACK_DEVICE_INDEX, SUMMARIZER_BACKEND, NOTES_DIR, NAME_ALIASES
 from core.recorder import AudioRecorder
 from core.summarizer import Summarizer
+from core.summarizer_deepseek import DeepSeekSummarizer
 from core.summarizer_gemini import GeminiSummarizer
 from core.exporter import DocumentExporter
 from storage.models import Meeting, Topic, Bullet, NextStep
@@ -16,10 +17,13 @@ class MeetingController:
         # Recorder inicializado sem loopback — detecção ocorre lazy em start_meeting()
         self._recorder = AudioRecorder(mic_device=MIC_DEVICE_INDEX, loopback_device=None)
         self._loopback_ready = False
-        self._summarizer = GeminiSummarizer() if SUMMARIZER_BACKEND == "gemini" else Summarizer()
+        self._summarizer = create_summarizer(SUMMARIZER_BACKEND)
         self._exporter = DocumentExporter()
         self._current: Meeting | None = None
         database.init_db()
+
+    def set_summarizer_backend(self, backend: str):
+        self._summarizer = create_summarizer(backend)
 
     def set_devices(self, mic_index: int | None, loopback_index: int | None):
         """Permite troca de dispositivos em runtime (ex: tela de configurações)."""
@@ -107,19 +111,27 @@ class MeetingController:
             raise RuntimeError("Sem transcrição para sumarizar.")
 
         plain = _plain_from_transcript(self._current.transcript_text)
+        result = None
         try:
             result = self._summarizer.summarize(plain, self._current.profile)
-        except Exception as primary_exc:
-            # Fallback: se Gemini falhar (503, timeout, etc), tenta Claude automaticamente.
-            fallback = self._build_fallback_summarizer()
-            if fallback is None:
-                raise
-            self._fallback_reason = f"{self._summarizer.backend} falhou ({primary_exc}). Usando {fallback.backend}."
-            result = fallback.summarize(plain, self._current.profile)
-            self._summarizer_used = fallback
-        else:
             self._fallback_reason = None
             self._summarizer_used = self._summarizer
+        except Exception as primary_exc:
+            fallback_errors = []
+            for fallback in self._build_fallback_summarizers():
+                try:
+                    result = fallback.summarize(plain, self._current.profile)
+                except Exception as fallback_exc:
+                    fallback_errors.append(f"{fallback.backend}: {fallback_exc}")
+                    continue
+                self._fallback_reason = f"{self._summarizer.backend} falhou ({primary_exc}). Usando {fallback.backend}."
+                self._summarizer_used = fallback
+                break
+            else:
+                detail = "; ".join(fallback_errors)
+                if detail:
+                    raise RuntimeError(f"Falha ao sumarizar. Fallbacks também falharam: {detail}") from primary_exc
+                raise
 
         self._current.topics = [
             Topic(
@@ -156,7 +168,7 @@ class MeetingController:
             for step in self._current.next_steps:
                 step.action = _apply_wikilinks(step.action, entities)
 
-        self._current.ollama_model = ANTHROPIC_MODEL
+        self._current.ollama_model = getattr(self._summarizer_used, "model", self._summarizer_used.backend)
         self._current.status = "done"
 
     # ------------------------------------------------------------------
@@ -196,18 +208,15 @@ class MeetingController:
     def is_ollama_available(self) -> bool:
         return self._summarizer.is_available()
 
-    def _build_fallback_summarizer(self):
-        """Retorna um summarizer alternativo disponível (backend diferente do atual)."""
+    def _build_fallback_summarizers(self):
+        """Retorna summarizers alternativos disponíveis, em ordem de preferência."""
         current_backend = self._summarizer.backend
-        if current_backend == "gemini":
-            claude = Summarizer()
-            if claude.is_available():
-                return claude
-        elif current_backend == "claude":
-            gemini = GeminiSummarizer()
-            if gemini.is_available():
-                return gemini
-        return None
+        for backend in ("deepseek", "claude", "gemini"):
+            if backend == current_backend:
+                continue
+            summarizer = create_summarizer(backend)
+            if summarizer.is_available():
+                yield summarizer
 
     def consume_fallback_notice(self) -> str | None:
         """Retorna (e limpa) mensagem do último fallback, se houve."""
@@ -309,6 +318,14 @@ def _parse_vtt(text: str) -> str:
             continue
         lines.append(line)
     return " ".join(lines)
+
+
+def create_summarizer(backend: str):
+    if backend == "gemini":
+        return GeminiSummarizer()
+    if backend == "deepseek":
+        return DeepSeekSummarizer()
+    return Summarizer()
 
 
 def _plain_from_transcript(text: str) -> str:

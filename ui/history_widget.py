@@ -123,7 +123,7 @@ class HistoryWidget(QWidget):
             return
         m = self._meetings[row]
         if m.output_md_path and Path(str(m.output_md_path)).exists():
-            subprocess.Popen(["explorer", str(m.output_md_path)], shell=True)
+            subprocess.Popen(["explorer", str(m.output_md_path)])
 
 
 def _build_preview(m: Meeting) -> str:

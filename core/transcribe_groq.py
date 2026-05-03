@@ -7,6 +7,7 @@ Limite gratuito: 7.200 segundos de áudio/hora, 28.800/dia.
 """
 import io
 import json
+import os
 import sys
 import wave
 import tempfile
@@ -93,8 +94,12 @@ def main():
     audio_path = Path(sys.argv[1])
     model     = sys.argv[2] if len(sys.argv) > 2 else "whisper-large-v3-turbo"
     language  = sys.argv[3] if len(sys.argv) > 3 else "pt"
-    api_key   = sys.argv[4] if len(sys.argv) > 4 else ""
-    prompt    = sys.argv[5] if len(sys.argv) > 5 else ""
+    api_key   = os.getenv("GROQ_API_KEY", "")
+    prompt    = sys.argv[4] if len(sys.argv) > 4 else ""
+
+    # Formato antigo tinha api_key em argv[4]; a chave agora deve vir só do ambiente.
+    if len(sys.argv) > 5:
+        prompt = sys.argv[5]
 
     if not audio_path.exists():
         print(json.dumps({"error": f"Arquivo não encontrado: {audio_path}"}))

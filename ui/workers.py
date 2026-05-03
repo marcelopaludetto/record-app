@@ -69,9 +69,10 @@ class ProcessingWorker(QThread):
             clean_env["PYTHONPATH"] = ""
             clean_env["PYTHONIOENCODING"] = "utf-8"
             clean_env["PYTHONUTF8"] = "1"
+            clean_env["GROQ_API_KEY"] = GROQ_API_KEY
 
             cmd = [_PYTHON, _TRANSCRIBE_GROQ, audio_path,
-                   GROQ_WHISPER_MODEL, WHISPER_LANGUAGE, GROQ_API_KEY, WHISPER_PROMPT]
+                   GROQ_WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_PROMPT]
 
             proc = subprocess.Popen(
                 cmd,

@@ -44,6 +44,8 @@ O setup cria um arquivo `.env` na pasta do projeto. Abra-o em qualquer editor e 
 GROQ_API_KEY=sua_chave_aqui
 ANTHROPIC_API_KEY=sua_chave_aqui
 GEMINI_API_KEY=sua_chave_aqui
+DEEPSEEK_API_KEY=sua_chave_aqui
+SUMMARIZER_BACKEND=deepseek
 ```
 
 Onde obter cada chave:
@@ -53,8 +55,9 @@ Onde obter cada chave:
 | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) | Sim (transcrição) |
 | `GEMINI_API_KEY` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | Para usar backend Gemini |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) | Para usar backend Claude |
+| `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) | Para usar backend DeepSeek |
 
-> O backend padrão é **Gemini**. Você não precisa da chave Anthropic para começar.
+> O backend inicial é definido por `SUMMARIZER_BACKEND`: `claude`, `gemini` ou `deepseek`. A escolha feita no app fica salva em `settings.json`.
 
 ### 4. Inicie o app
 

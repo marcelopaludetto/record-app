@@ -17,6 +17,8 @@ pywin32>=306
 # APIs
 groq>=0.4.0
 anthropic>=0.20.0
+httpx>=0.27.0
+json-repair>=0.30.0
 
 # Loopback de áudio (WASAPI)
 pyaudiowpatch

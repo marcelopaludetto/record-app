@@ -17,6 +17,10 @@ class Summarizer:
     def backend(self) -> str:
         return "claude"
 
+    @property
+    def model(self) -> str:
+        return ANTHROPIC_MODEL
+
     def summarize(self, transcript: str, profile: str = "trabalho") -> dict:
         return self._summarize_claude(transcript[:150000], profile)
 

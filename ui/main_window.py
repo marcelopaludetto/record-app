@@ -12,7 +12,7 @@ from PyQt6.QtGui import QFont, QIcon, QAction, QCloseEvent
 
 import config
 from config import APP_NAME, APP_VERSION
-from storage.settings import save_notes_dir, get_last_profile, save_last_profile
+from storage.settings import save_notes_dir, get_last_profile, save_last_profile, save_summarizer_backend
 from core.meeting_controller import MeetingController
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
@@ -73,9 +73,9 @@ class MainWindow(QMainWindow):
         header.addWidget(self._label_status, stretch=1)
 
         self._combo_backend = QComboBox()
-        self._combo_backend.addItems(["claude", "gemini"])
+        self._combo_backend.addItems(["claude", "gemini", "deepseek"])
         self._combo_backend.setCurrentText(config.SUMMARIZER_BACKEND)
-        self._combo_backend.setFixedWidth(82)
+        self._combo_backend.setFixedWidth(98)
         self._combo_backend.setFixedHeight(24)
         self._combo_backend.currentTextChanged.connect(self._on_backend_changed)
         header.addWidget(self._combo_backend)
@@ -487,10 +487,9 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_backend_changed(self, backend: str):
-        from core.summarizer import Summarizer
-        from core.summarizer_gemini import GeminiSummarizer
         config.SUMMARIZER_BACKEND = backend
-        self._controller._summarizer = GeminiSummarizer() if backend == "gemini" else Summarizer()
+        save_summarizer_backend(backend)
+        self._controller.set_summarizer_backend(backend)
         self._check_api()
 
     def _check_api(self):
@@ -508,24 +507,32 @@ class MainWindow(QMainWindow):
             self._label_api.setStyleSheet("color: #a6e3a1; font-size: 12px;")
             return
 
-        # Gemini: ping real em background
-        self._label_api.setText("🟡 Verificando Gemini...")
+        # Gemini/DeepSeek: ping real em background
+        label = "Gemini" if backend == "gemini" else "DeepSeek"
+        self._label_api.setText(f"🟡 Verificando {label}...")
         self._label_api.setStyleSheet("color: #f9e2af; font-size: 12px;")
-        self._gemini_ping_thread = _GeminiPingThread(summarizer)
-        self._gemini_ping_thread.result.connect(self._on_gemini_ping_result)
-        self._gemini_ping_thread.start()
+        self._api_ping_thread = _ApiPingThread(summarizer)
+        self._api_ping_thread.result.connect(self._on_api_ping_result)
+        self._api_ping_thread.start()
 
-    @pyqtSlot(bool, str)
-    def _on_gemini_ping_result(self, ok: bool, message: str):
+    @pyqtSlot(str, bool, str)
+    def _on_api_ping_result(self, backend: str, ok: bool, message: str):
+        if backend != self._controller._summarizer.backend:
+            return
+        label = "Gemini" if backend == "gemini" else "DeepSeek"
         if ok:
-            self._label_api.setText("🟢 Gemini alcançável")
-            self._label_api.setToolTip(
-                "Endpoint /models respondeu OK. O generateContent pode ainda "
-                "retornar 503 — nesse caso há fallback automático para Claude."
-            )
+            self._label_api.setText(f"🟢 {label} alcançável")
+            if backend == "gemini":
+                self._label_api.setToolTip(
+                    "Endpoint /models respondeu OK. O generateContent pode ainda "
+                    "retornar 503 — nesse caso há fallback automático."
+                )
+            else:
+                from config import DEEPSEEK_MODEL
+                self._label_api.setToolTip(f"Modelo configurado: {DEEPSEEK_MODEL}")
             self._label_api.setStyleSheet("color: #a6e3a1; font-size: 12px;")
         else:
-            self._label_api.setText(f"🔴 Gemini — {message}")
+            self._label_api.setText(f"🔴 {label} — {message}")
             self._label_api.setToolTip("")
             self._label_api.setStyleSheet("color: #f38ba8; font-size: 12px;")
 
@@ -548,17 +555,18 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _open_notes_folder(self):
         import subprocess
-        subprocess.Popen(["explorer", str(self._notes_dir)], shell=True)
+        subprocess.Popen(["explorer", str(self._notes_dir)])
 
     @pyqtSlot()
     def _open_in_obsidian(self):
+        import os
         import urllib.parse
         encoded = urllib.parse.quote(str(self._notes_dir), safe="")
-        subprocess.Popen(["start", f"obsidian://open?path={encoded}"], shell=True)
+        os.startfile(f"obsidian://open?path={encoded}")
 
 
-class _GeminiPingThread(QThread):
-    result = pyqtSignal(bool, str)
+class _ApiPingThread(QThread):
+    result = pyqtSignal(str, bool, str)
 
     def __init__(self, summarizer):
         super().__init__()
@@ -566,4 +574,4 @@ class _GeminiPingThread(QThread):
 
     def run(self):
         ok, msg = self._summarizer.ping()
-        self.result.emit(ok, msg)
+        self.result.emit(self._summarizer.backend, ok, msg)

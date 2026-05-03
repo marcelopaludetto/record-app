@@ -24,6 +24,10 @@ class GeminiSummarizer(_BaseSummarizer):
     def backend(self) -> str:
         return "gemini"
 
+    @property
+    def model(self) -> str:
+        return GEMINI_MODEL
+
     def is_available(self) -> bool:
         return bool(GEMINI_API_KEY.strip())
 

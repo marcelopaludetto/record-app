@@ -40,3 +40,16 @@ def save_last_profile(profile: str):
     data = _load()
     data["last_profile"] = profile
     _save(data)
+
+
+def get_summarizer_backend(default: str = "deepseek") -> str:
+    if default not in ("claude", "gemini", "deepseek"):
+        default = "deepseek"
+    backend = _load().get("summarizer_backend", default)
+    return backend if backend in ("claude", "gemini", "deepseek") else default
+
+
+def save_summarizer_backend(backend: str):
+    data = _load()
+    data["summarizer_backend"] = backend
+    _save(data)

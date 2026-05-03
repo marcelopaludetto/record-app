@@ -13,8 +13,8 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 DB_PATH = DATA_DIR / "meetings.db"
 _NOTES_DIR_DEFAULT = Path(os.getenv("NOTES_DIR", "")) or Path.home() / "Documents" / "Notes"
 
-# Carrega NOTES_DIR do settings.json se o usuário tiver alterado
-from storage.settings import get_notes_dir as _get_notes_dir
+# Carrega settings.json se o usuário tiver alterado configurações pela UI
+from storage.settings import get_notes_dir as _get_notes_dir, get_summarizer_backend as _get_summarizer_backend
 NOTES_DIR = _get_notes_dir(_NOTES_DIR_DEFAULT)
 
 # Garantir que os diretórios existem
@@ -25,15 +25,25 @@ for _dir in [AUDIO_DIR, TRANSCRIPTIONS_DIR, NOTES_DIR]:
 GROQ_API_KEY       = os.getenv("GROQ_API_KEY", "")
 GROQ_WHISPER_MODEL = "whisper-large-v3-turbo"  # whisper-large-v3-turbo | whisper-large-v3 | distil-whisper-large-v3-en
 WHISPER_LANGUAGE   = "pt"
-# Vocabulário para melhorar o reconhecimento de nomes e termos específicos.
-# Separe palavras/frases por vírgula. Ex: "Marcelo, ClickUp, sprint, roadmap"
-WHISPER_PROMPT     = "Marcelo, Marcelo, Alurona, EFAF, EFAI, Alurona, EFAF, Daiane, Jéssica, Deia, Bina, Eve, Clari, Lu, Alura Start, EM, forms."
+# Contexto enviado ao Whisper/Groq para orientar idioma, grafias e termos recorrentes.
+# Isto é uma dica de transcrição, não uma regra rígida. Correções garantidas ficam em
+# NAME_ALIASES, que é aplicado depois da transcrição.
+WHISPER_PROMPT     = (
+    "Transcrição de reuniões em português do Brasil sobre educação, tecnologia e projetos da Alura. "
+    "Podem aparecer estes termos e grafias: Alura, Alura Start, EFAF, EFAI, EM, SEDUC-SP, Forms, "
+    "ClickUp, sprint, roadmap, Marcelo, Daiane, Jéssica, Andreia, Ana Beatriz, Evellyn, Lizandra, "
+    "Guilherme, Isabella, Jane, Giovana, Giulliana, Luana, Joyce, Karol, Gabriel, Deia, Bina, Eve, "
+    "Clari e Lu."
+)
 
-# Sumarização via Anthropic Claude / Google Gemini
+# Sumarização via Anthropic Claude / Google Gemini / DeepSeek
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
+DEEPSEEK_API_KEY  = os.getenv("DEEPSEEK_API_KEY", "")
 ANTHROPIC_MODEL   = "claude-haiku-4-5-20251001"
-SUMMARIZER_BACKEND = "claude"  # "claude" | "gemini"
+DEEPSEEK_MODEL    = "deepseek-v4-flash"
+_SUMMARIZER_BACKEND_DEFAULT = os.getenv("SUMMARIZER_BACKEND", "deepseek")
+SUMMARIZER_BACKEND = _get_summarizer_backend(_SUMMARIZER_BACKEND_DEFAULT)  # "claude" | "gemini" | "deepseek"
 
 # Áudio
 AUDIO_SAMPLE_RATE = 16000
