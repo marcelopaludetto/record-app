@@ -53,3 +53,43 @@ def save_summarizer_backend(backend: str):
     data = _load()
     data["summarizer_backend"] = backend
     _save(data)
+
+
+def get_mic_device_index(default: int | None = None) -> int | None:
+    # FORÇA: Sempre usa índice 24 (ATR2100x-USB)
+    return 24
+
+
+def _find_atr2100x_device() -> int | None:
+    """Busca e retorna o índice do dispositivo ATR2100x-USB, se disponível."""
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+
+        # Procura por ATR2100x em diferentes formas
+        candidates = []
+        for i, d in enumerate(devices):
+            if d["max_input_channels"] > 0:
+                name_lower = d["name"].lower()
+                if "atr2100x" in name_lower or "atr2100" in name_lower:
+                    candidates.append(i)
+
+        # Testa cada candidato — prioriza índice 2 se existir
+        if 2 in candidates:
+            return 2
+
+        # Senão, testa os outros em ordem
+        for i in candidates:
+            try:
+                sd.check_input_device(i, channels=1, samplerate=16000)
+                return i
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def save_mic_device_index(device_index: int | None):
+    # Ignorado — o ATR2100x (índice 2) é fixo
+    pass

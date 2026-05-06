@@ -12,7 +12,7 @@ from PyQt6.QtGui import QFont, QIcon, QAction, QCloseEvent
 
 import config
 from config import APP_NAME, APP_VERSION
-from storage.settings import save_notes_dir, get_last_profile, save_last_profile, save_summarizer_backend
+from storage.settings import save_notes_dir, get_last_profile, save_last_profile, save_summarizer_backend, save_mic_device_index
 from core.meeting_controller import MeetingController
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
@@ -230,10 +230,14 @@ class MainWindow(QMainWindow):
 
         title   = dlg.get_title()
         profile = dlg.get_profile()
+        mic_device = dlg.get_mic_device_index()
         if not title:
             return
 
+        save_mic_device_index(mic_device)
+
         try:
+            self._controller.set_devices(mic_device, None)
             self._controller.start_meeting(title, profile)
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))

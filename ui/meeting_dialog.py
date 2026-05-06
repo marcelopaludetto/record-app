@@ -4,12 +4,12 @@ Diálogo de Nova Reunião — título, perfil e dispositivos de áudio.
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QDialogButtonBox, QGroupBox,
-    QHBoxLayout, QRadioButton, QButtonGroup,
+    QHBoxLayout, QRadioButton, QButtonGroup, QComboBox,
 )
 from PyQt6.QtCore import Qt
 
 from core.recorder import AudioRecorder
-from storage.settings import get_last_profile, save_last_profile
+from storage.settings import get_last_profile, save_last_profile, get_mic_device_index, save_mic_device_index
 
 
 PROFILE_OPTIONS = [
@@ -58,11 +58,37 @@ class NewMeetingDialog(QDialog):
         devices_group = QGroupBox("Dispositivos de áudio")
         devices_layout = QVBoxLayout(devices_group)
 
-        rec = self._controller._recorder
-        mic_name = self._get_mic_name(rec.mic_device)
-        devices_layout.addWidget(QLabel(f"🎤 Microfone: {mic_name}"))
+        # Microfone: dropdown com seleção
+        mic_layout = QHBoxLayout()
+        mic_layout.setSpacing(8)
+        mic_layout.addWidget(QLabel("🎤 Microfone:"))
 
+        self._combo_mic = QComboBox()
+        mic_devices = AudioRecorder.list_mic_devices()
+        self._mic_device_map = {}
+
+        # Opção padrão
+        self._combo_mic.addItem("(padrão) Padrão do sistema", None)
+        self._mic_device_map[0] = None
+
+        # Adiciona dispositivos disponíveis
+        current_mic = get_mic_device_index()
+        selected_idx = 0
+        for i, dev in enumerate(mic_devices, start=1):
+            # Mostra índice + nome
+            item_text = f"[{dev['index']}] {dev['name']}"
+            self._combo_mic.addItem(item_text, dev["index"])
+            self._mic_device_map[i] = dev["index"]
+            if dev["index"] == current_mic:
+                selected_idx = i
+
+        self._combo_mic.setCurrentIndex(selected_idx)
+        mic_layout.addWidget(self._combo_mic)
+        devices_layout.addLayout(mic_layout)
+
+        # Loopback (sistema)
         loopback_name = None
+        rec = self._controller._recorder
         if rec.loopback_device is not None:
             lb_list = AudioRecorder.list_loopback_devices()
             lb_info = next((d for d in lb_list if d["index"] == rec.loopback_device), None)
@@ -101,11 +127,6 @@ class NewMeetingDialog(QDialog):
         save_last_profile(profile)
         return profile
 
-    def _get_mic_name(self, device_index) -> str:
-        try:
-            import sounddevice as sd
-            if device_index is None:
-                return sd.query_devices(kind="input")["name"]
-            return sd.query_devices(device_index)["name"]
-        except Exception:
-            return "padrão do sistema"
+    def get_mic_device_index(self) -> int | None:
+        idx = self._combo_mic.currentIndex()
+        return self._mic_device_map.get(idx)

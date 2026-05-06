@@ -13,7 +13,18 @@ from pathlib import Path
 import numpy as np
 import sounddevice as sd
 
-from config import AUDIO_SAMPLE_RATE, AUDIO_CHANNELS
+from config import AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, DATA_DIR
+
+
+def _log(msg: str):
+    """Log em console E em arquivo."""
+    print(msg)
+    log_file = DATA_DIR / "recorder.log"
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
 
 
 class AudioRecorder:
@@ -34,6 +45,7 @@ class AudioRecorder:
         self._mic_stream = None
         self._loopback_thread: threading.Thread | None = None
         self._loopback_rate: int = 48000  # será atualizado ao abrir o stream
+        self._mic_rate: int = AUDIO_SAMPLE_RATE  # taxa real do mic (pode ser 48000)
         self.is_recording = False
 
     # ------------------------------------------------------------------
@@ -42,12 +54,11 @@ class AudioRecorder:
 
     @staticmethod
     def list_mic_devices() -> list[dict]:
-        return [
-            {"index": i, "name": d["name"]}
-            for i, d in enumerate(sd.query_devices())
-            if d["max_input_channels"] > 0 and "loopback" not in d["name"].lower()
-            and sd.query_hostapis()[d["hostapi"]]["name"] == "Windows WASAPI"
-        ]
+        result = []
+        for i, d in enumerate(sd.query_devices()):
+            if d["max_input_channels"] > 0 and "loopback" not in d["name"].lower() and sd.query_hostapis()[d["hostapi"]]["name"] == "Windows WASAPI":
+                result.append({"index": i, "name": d["name"]})
+        return result
 
     @staticmethod
     def list_loopback_devices() -> list[dict]:
@@ -120,15 +131,67 @@ class AudioRecorder:
                 with self._lock:
                     self._mic_frames.append(indata.copy())
 
-        self._mic_stream = sd.InputStream(
-            samplerate=self.sample_rate,
-            channels=1,
-            dtype="int16",
-            device=self.mic_device,
-            callback=_mic_callback,
-            blocksize=1024,
-        )
-        self._mic_stream.start()
+        mic_device = self.mic_device
+        stream_rate = self.sample_rate
+        self._mic_rate = stream_rate
+        try:
+            # Tenta com 1 canal a 16kHz primeiro
+            self._mic_stream = sd.InputStream(
+                samplerate=stream_rate,
+                channels=1,
+                dtype="int16",
+                device=mic_device,
+                callback=_mic_callback,
+                blocksize=1024,
+            )
+            self._mic_stream.start()
+            self._mic_rate = stream_rate
+            actual_device = self._mic_stream.device
+            device_info = sd.query_devices(actual_device)
+            _log(f"[RECORDER] Gravando com: Índice {actual_device} | {device_info['name']} @ {stream_rate}Hz")
+        except Exception as e:
+            # Se falhar, tenta com 48kHz (comum em USB)
+            if mic_device is not None:
+                try:
+                    _log(f"[RECORDER] Falha com {stream_rate}Hz, tentando com 48000Hz...")
+                    stream_rate = 48000
+                    self._mic_rate = 48000
+
+                    def _mic_callback_48k(indata, frames, time_info, status):
+                        if not self._stop_event.is_set():
+                            with self._lock:
+                                self._mic_frames.append(indata.copy())
+
+                    self._mic_stream = sd.InputStream(
+                        samplerate=stream_rate,
+                        channels=1,
+                        dtype="int16",
+                        device=mic_device,
+                        callback=_mic_callback_48k,
+                        blocksize=1024,
+                    )
+                    self._mic_stream.start()
+                    self._mic_rate = 48000
+                    actual_device = self._mic_stream.device
+                    device_info = sd.query_devices(actual_device)
+                    _log(f"[RECORDER] Gravando com: Índice {actual_device} | {device_info['name']} @ 48000Hz")
+                except Exception as e2:
+                    _log(f"[RECORDER] Falha ao abrir dispositivo {mic_device}, voltando para padrão")
+                    self._mic_stream = sd.InputStream(
+                        samplerate=self.sample_rate,
+                        channels=1,
+                        dtype="int16",
+                        device=None,
+                        callback=_mic_callback,
+                        blocksize=1024,
+                    )
+                    self._mic_stream.start()
+                    self._mic_rate = self.sample_rate
+                    actual_device = self._mic_stream.device
+                    device_info = sd.query_devices(actual_device)
+                    _log(f"[RECORDER] Gravando com padrão: Índice {actual_device} | {device_info['name']}")
+            else:
+                raise
 
         # Stream de loopback via pyaudiowpatch (thread separada)
         if self.loopback_device is not None:
@@ -201,6 +264,13 @@ class AudioRecorder:
                 if self._loopback_frames
                 else None
             )
+
+        # Resample mic se foi gravado a taxa diferente
+        if self._mic_rate != self.sample_rate:
+            ratio = self.sample_rate / self._mic_rate
+            new_len = int(len(mic_audio) * ratio)
+            indices = np.linspace(0, len(mic_audio) - 1, new_len)
+            mic_audio = np.interp(indices, np.arange(len(mic_audio)), mic_audio).astype(np.int16)
 
         # Mistura mic + loopback (se disponível)
         mixed = _mix_audio(mic_audio, loopback_raw, self._loopback_rate, self.sample_rate)

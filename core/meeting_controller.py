@@ -41,13 +41,16 @@ class MeetingController:
         if self._current and self._recorder.is_recording:
             raise RuntimeError("Já existe uma reunião em andamento.")
         if not self._loopback_ready:
-            loopback_idx = LOOPBACK_DEVICE_INDEX
-            if loopback_idx is None:
-                default = AudioRecorder.get_default_loopback()
-                loopback_idx = default["index"] if default else None
+            # Desativa loopback por padrão — pode estar causando eco
+            loopback_idx = None
             self._recorder = AudioRecorder(mic_device=MIC_DEVICE_INDEX, loopback_device=loopback_idx)
             self._loopback_ready = True
         self._current = Meeting(title=title, started_at=datetime.now(), profile=profile)
+        from config import DATA_DIR
+        log_file = DATA_DIR / "recorder.log"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[MEETING] Iniciando gravação: '{title}' | Perfil: {profile}\n")
+            f.write(f"[MEETING] Loopback ativo: {self._recorder.has_loopback}\n")
         self._recorder.start()
 
     def import_txt(self, txt_path: Path, title: str, profile: str = "trabalho"):

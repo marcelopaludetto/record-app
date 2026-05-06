@@ -1,5 +1,6 @@
 {
   "notes_dir": "C:\\Users\\Marcelo\\Documents\\Notes",
   "last_profile": "trabalho",
-  "summarizer_backend": "deepseek"
+  "summarizer_backend": "deepseek",
+  "mic_device_index": 24
 }

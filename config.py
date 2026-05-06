@@ -16,7 +16,7 @@ PERSONAL_TERMS_PATH = BASE_DIR / "personal_terms.json"
 _NOTES_DIR_DEFAULT = Path(os.getenv("NOTES_DIR", "")) or Path.home() / "Documents" / "Notes"
 
 # Carrega settings.json se o usuário tiver alterado configurações pela UI
-from storage.settings import get_notes_dir as _get_notes_dir, get_summarizer_backend as _get_summarizer_backend
+from storage.settings import get_notes_dir as _get_notes_dir, get_summarizer_backend as _get_summarizer_backend, get_mic_device_index as _get_mic_device_index
 NOTES_DIR = _get_notes_dir(_NOTES_DIR_DEFAULT)
 
 # Garantir que os diretórios existem
@@ -54,7 +54,7 @@ AUDIO_CHANNELS = 1
 
 # Dispositivos de áudio (None = padrão do sistema)
 # Altere esses valores para fixar um dispositivo específico
-MIC_DEVICE_INDEX: int | None = None       # None = microfone padrão
+MIC_DEVICE_INDEX: int | None = 24  # FIXO: ATR2100x-USB no índice 24
 LOOPBACK_DEVICE_INDEX: int | None = None  # None = detecta automaticamente
 
 # Correções de nomes: como a IA/Whisper escreve → como deve aparecer no Obsidian.
