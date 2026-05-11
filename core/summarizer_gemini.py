@@ -1,7 +1,6 @@
 """
 Sumarização de transcrições via Google Gemini API.
 """
-import json
 import time
 import httpx
 

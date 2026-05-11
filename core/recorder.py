@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import sounddevice as sd
 
-from config import AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, DATA_DIR
+from config import AUDIO_SAMPLE_RATE, DATA_DIR
 
 
 def _log(msg: str):
@@ -283,27 +283,6 @@ class AudioRecorder:
             wf.writeframes(mixed.tobytes())
 
         return output_path
-
-    def get_mixed_audio(self) -> np.ndarray:
-        """Snapshot mono int16 do áudio capturado até agora (mic + loopback mixados).
-        Thread-safe — para uso do transcritor ao vivo sem interferir na gravação.
-        """
-        with self._lock:
-            if not self._mic_frames:
-                return np.array([], dtype=np.int16)
-            mic = np.concatenate(self._mic_frames, axis=0).flatten()
-            loop = (
-                np.concatenate(self._loopback_frames, axis=0).flatten()
-                if self._loopback_frames else None
-            )
-        return _mix_audio(mic, loop, self._loopback_rate, self.sample_rate)
-
-    @property
-    def recorded_seconds(self) -> float:
-        with self._lock:
-            if not self._mic_frames:
-                return 0.0
-            return sum(f.shape[0] for f in self._mic_frames) / self.sample_rate
 
     @property
     def has_loopback(self) -> bool:

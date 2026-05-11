@@ -16,7 +16,7 @@ PERSONAL_TERMS_PATH = BASE_DIR / "personal_terms.json"
 _NOTES_DIR_DEFAULT = Path(os.getenv("NOTES_DIR", "")) or Path.home() / "Documents" / "Notes"
 
 # Carrega settings.json se o usuário tiver alterado configurações pela UI
-from storage.settings import get_notes_dir as _get_notes_dir, get_summarizer_backend as _get_summarizer_backend, get_mic_device_index as _get_mic_device_index
+from storage.settings import get_notes_dir as _get_notes_dir, get_summarizer_backend as _get_summarizer_backend
 NOTES_DIR = _get_notes_dir(_NOTES_DIR_DEFAULT)
 
 # Garantir que os diretórios existem

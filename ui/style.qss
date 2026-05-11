@@ -158,12 +158,6 @@ QLabel#progress_label {
     padding-bottom: 2px;
 }
 
-QLabel#section_label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #a6adc8;
-}
-
 /* ── Separador ────────────────────────────────────────────────────── */
 QFrame#separator {
     background-color: #313244;
@@ -184,18 +178,6 @@ QProgressBar {
 QProgressBar::chunk {
     background-color: #89b4fa;
     border-radius: 4px;
-}
-
-/* ── Área de transcrição (monospace) ──────────────────────────────── */
-QPlainTextEdit#transcript_view {
-    background-color: #181825;
-    border: 1px solid #313244;
-    border-radius: 8px;
-    padding: 10px;
-    color: #bac2de;
-    font-family: "Consolas", "Cascadia Code", monospace;
-    font-size: 13px;
-    line-height: 1.5;
 }
 
 /* ── Campos de texto e combo ──────────────────────────────────────── */
@@ -243,38 +225,6 @@ QComboBox QAbstractItemView {
     border: 1px solid #45475a;
     color: #cdd6f4;
     selection-background-color: #45475a;
-}
-
-/* ── Lista do histórico ───────────────────────────────────────────── */
-QListWidget {
-    background-color: #181825;
-    border: none;
-    padding: 4px;
-    outline: none;
-}
-
-QListWidget::item {
-    padding: 10px 8px;
-    border-bottom: 1px solid #313244;
-    color: #bac2de;
-    font-size: 13px;
-    line-height: 1.4;
-}
-
-QListWidget::item:selected {
-    background-color: #2a2a3e;
-    color: #cdd6f4;
-    border-left: 3px solid #89b4fa;
-}
-
-QListWidget::item:hover:!selected {
-    background-color: #252535;
-}
-
-/* ── Splitter ─────────────────────────────────────────────────────── */
-QSplitter::handle {
-    background-color: #313244;
-    width: 1px;
 }
 
 /* ── Scrollbars ───────────────────────────────────────────────────── */

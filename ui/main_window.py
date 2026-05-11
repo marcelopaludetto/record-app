@@ -1,14 +1,13 @@
-import subprocess
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QProgressBar, QTabWidget,
-    QStatusBar, QMessageBox, QPlainTextEdit,
+    QStatusBar, QMessageBox,
     QSystemTrayIcon, QMenu, QFileDialog, QComboBox, QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QFont, QIcon, QAction, QCloseEvent
+from PyQt6.QtGui import QAction, QCloseEvent
 
 import config
 from config import APP_NAME, APP_VERSION

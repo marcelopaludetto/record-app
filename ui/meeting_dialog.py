@@ -3,13 +3,13 @@ Diálogo de Nova Reunião — título, perfil e dispositivos de áudio.
 """
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QPushButton, QDialogButtonBox, QGroupBox,
+    QLabel, QLineEdit, QDialogButtonBox, QGroupBox,
     QHBoxLayout, QRadioButton, QButtonGroup, QComboBox,
 )
 from PyQt6.QtCore import Qt
 
 from core.recorder import AudioRecorder
-from storage.settings import get_last_profile, save_last_profile, get_mic_device_index, save_mic_device_index
+from storage.settings import get_last_profile, save_last_profile, get_mic_device_index
 
 
 PROFILE_OPTIONS = [

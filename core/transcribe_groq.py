@@ -5,7 +5,6 @@ Muito mais rápido que inferência local — gratuito com rate limit generoso.
 Limite por requisição: 25 MB. Arquivos maiores são divididos em chunks automaticamente.
 Limite gratuito: 7.200 segundos de áudio/hora, 28.800/dia.
 """
-import io
 import json
 import os
 import sys

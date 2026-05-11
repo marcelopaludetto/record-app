@@ -79,35 +79,6 @@ def save_meeting(meeting: Meeting) -> int:
         return cur.lastrowid
 
 
-def update_meeting(meeting: Meeting):
-    if meeting.id is None:
-        raise ValueError("Cannot update meeting without id")
-    with _connect() as conn:
-        conn.execute("""
-            UPDATE meetings SET
-                title=?, ended_at=?, status=?, audio_path=?,
-                transcript_path=?, output_md_path=?, transcript_text=?,
-                topics=?, next_steps=?,
-                whisper_model=?, ollama_model=?, error_message=?
-            WHERE id=?
-        """, (
-            meeting.title,
-            meeting.ended_at.isoformat() if meeting.ended_at else None,
-            meeting.status,
-            str(meeting.audio_path) if meeting.audio_path else None,
-            str(meeting.transcript_path) if meeting.transcript_path else None,
-            str(meeting.output_md_path) if meeting.output_md_path else None,
-            meeting.transcript_text,
-            _topics_to_json(meeting.topics),
-            _next_steps_to_json(meeting.next_steps),
-            meeting.whisper_model,
-            meeting.ollama_model,
-            meeting.error_message,
-            meeting.id,
-        ))
-        conn.commit()
-
-
 def list_active_meetings() -> list[Meeting]:
     """Retorna apenas reuniões em pipeline (não concluídas)."""
     with _connect() as conn:
@@ -121,20 +92,6 @@ def delete_meeting(meeting_id: int) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM meetings WHERE id=?", (meeting_id,))
         conn.commit()
-
-
-def list_meetings(limit: int = 100) -> list[Meeting]:
-    with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM meetings ORDER BY started_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-    return [_row_to_meeting(r) for r in rows]
-
-
-def get_meeting(meeting_id: int) -> Meeting | None:
-    with _connect() as conn:
-        row = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
-    return _row_to_meeting(row) if row else None
 
 
 # ------------------------------------------------------------------

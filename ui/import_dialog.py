@@ -3,7 +3,7 @@ Diálogo unificado para importação de áudio ou TXT.
 Coleta título e tipo em uma única janela, sem dialogs sequenciais.
 """
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLabel, QLineEdit,
+    QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QDialogButtonBox, QHBoxLayout, QRadioButton, QButtonGroup,
 )
 from PyQt6.QtCore import Qt

@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from config import AUDIO_DIR, MIC_DEVICE_INDEX, LOOPBACK_DEVICE_INDEX, SUMMARIZER_BACKEND, NOTES_DIR, NAME_ALIASES
+from config import AUDIO_DIR, MIC_DEVICE_INDEX, SUMMARIZER_BACKEND, NOTES_DIR, NAME_ALIASES
 from core.recorder import AudioRecorder
 from core.summarizer import Summarizer
 from core.summarizer_deepseek import DeepSeekSummarizer
@@ -101,10 +101,6 @@ class MeetingController:
         self._current.audio_path = audio_path
         self._current.status = "transcribing"
 
-    @property
-    def recorded_seconds(self) -> float:
-        return self._recorder.recorded_seconds
-
     # ------------------------------------------------------------------
     # Sumarização
     # ------------------------------------------------------------------
@@ -201,15 +197,9 @@ class MeetingController:
         in_progress = database.list_active_meetings()
         return (in_progress + completed)[:limit]
 
-    def get_meeting(self, meeting_id: int) -> Meeting | None:
-        return database.get_meeting(meeting_id)
-
     # ------------------------------------------------------------------
     # Utilitários
     # ------------------------------------------------------------------
-
-    def is_ollama_available(self) -> bool:
-        return self._summarizer.is_available()
 
     def _build_fallback_summarizers(self):
         """Retorna summarizers alternativos disponíveis, em ordem de preferência."""
