@@ -11,13 +11,14 @@ from PyQt6.QtGui import QAction, QCloseEvent
 
 import config
 from config import APP_NAME, APP_VERSION
-from storage.settings import save_notes_dir, get_last_profile, save_last_profile, save_summarizer_backend, save_mic_device_index
+from storage.settings import save_notes_dir, get_last_profile, save_last_profile, save_summarizer_backend, save_mic_device_index, save_loopback_device_index
 from core.meeting_controller import MeetingController
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
 from ui.import_dialog import ImportDialog
 from ui.tray_icon import make_tray_icon
 from ui.agent_widget import AgentWidget
+from ui.level_sampler import LevelSampler
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +31,11 @@ class MainWindow(QMainWindow):
         self._timer.timeout.connect(self._update_timer)
         self._elapsed_seconds = 0
         self._notes_dir = config.NOTES_DIR
+        self._mic_sampler = LevelSampler()
+        self._loopback_sampler = LevelSampler()
+        self._meter_timer = QTimer(self)
+        self._meter_timer.setInterval(80)
+        self._meter_timer.timeout.connect(self._update_meters)
         self._setup_ui()
         self._setup_tray()
         QTimer.singleShot(0, self._check_api)
@@ -108,7 +114,44 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._btn_start)
         layout.addWidget(self._btn_stop)
-        layout.addSpacing(20)
+
+        # ── Medidores de nível (visíveis só durante gravação) ─────────
+        _METER_STYLE = """
+QProgressBar { border:1px solid #45475a; border-radius:3px;
+               background:#1e1e2e; max-height:10px; }
+QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+    stop:0 #a6e3a1, stop:0.75 #a6e3a1, stop:1 #f38ba8);
+    border-radius:2px; }
+"""
+        meters_widget = QWidget()
+        meters_layout = QVBoxLayout(meters_widget)
+        meters_layout.setContentsMargins(0, 8, 0, 0)
+        meters_layout.setSpacing(4)
+
+        mic_row = QHBoxLayout()
+        mic_row.addWidget(QLabel("🎤"))
+        self._meter_mic = QProgressBar()
+        self._meter_mic.setRange(0, 100)
+        self._meter_mic.setValue(0)
+        self._meter_mic.setTextVisible(False)
+        self._meter_mic.setStyleSheet(_METER_STYLE)
+        mic_row.addWidget(self._meter_mic)
+        meters_layout.addLayout(mic_row)
+
+        lb_row = QHBoxLayout()
+        lb_row.addWidget(QLabel("🔊"))
+        self._meter_loopback = QProgressBar()
+        self._meter_loopback.setRange(0, 100)
+        self._meter_loopback.setValue(0)
+        self._meter_loopback.setTextVisible(False)
+        self._meter_loopback.setStyleSheet(_METER_STYLE)
+        lb_row.addWidget(self._meter_loopback)
+        meters_layout.addLayout(lb_row)
+
+        self._meters_widget = meters_widget
+        self._meters_widget.hide()
+        layout.addWidget(self._meters_widget)
+        layout.addSpacing(12)
 
         # ── Progresso ─────────────────────────────────────────────────
         self._label_progress = QLabel()
@@ -212,6 +255,7 @@ class MainWindow(QMainWindow):
         self._btn_import_txt.setEnabled(idle or done or error)
 
         self._label_timer.setVisible(recording)
+        self._meters_widget.setVisible(recording)
 
         show_progress = processing or done or error
         self._label_progress.setVisible(show_progress)
@@ -230,13 +274,15 @@ class MainWindow(QMainWindow):
         title   = dlg.get_title()
         profile = dlg.get_profile()
         mic_device = dlg.get_mic_device_index()
+        loopback_device = dlg.get_loopback_device_index()
         if not title:
             return
 
         save_mic_device_index(mic_device)
+        save_loopback_device_index(loopback_device)
 
         try:
-            self._controller.set_devices(mic_device, None)
+            self._controller.set_devices(mic_device, loopback_device)
             self._controller.start_meeting(title, profile)
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))
@@ -254,9 +300,24 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"Gravação em andamento: {title}")
         self._set_state("recording")
 
+        # Inicia medidores de nível
+        self._mic_sampler.start_mic(mic_device)
+        if loopback_device is not None:
+            from core.recorder import AudioRecorder
+            lb_devs = AudioRecorder.list_loopback_devices()
+            lb_info = next((d for d in lb_devs if d["index"] == loopback_device), None)
+            if lb_info:
+                self._loopback_sampler.start_loopback(
+                    loopback_device, lb_info["rate"], lb_info["channels"]
+                )
+        self._meter_timer.start()
+
     @pyqtSlot()
     def _on_stop(self):
         self._timer.stop()
+        self._meter_timer.stop()
+        self._mic_sampler.stop()
+        self._loopback_sampler.stop()
 
         self._label_status.setText("Processando...")
         self._set_state("processing")
@@ -405,6 +466,11 @@ class MainWindow(QMainWindow):
         self._elapsed_seconds += 1
         m, s = divmod(self._elapsed_seconds, 60)
         self._label_timer.setText(f"{m:02d}:{s:02d}")
+
+    @pyqtSlot()
+    def _update_meters(self):
+        self._meter_mic.setValue(self._mic_sampler.level)
+        self._meter_loopback.setValue(self._loopback_sampler.level)
 
 # ------------------------------------------------------------------
     # System Tray

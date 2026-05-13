@@ -63,3 +63,17 @@ def get_mic_device_index(default: int | None = None) -> int | None:
 def save_mic_device_index(device_index: int | None):
     # Ignorado — o ATR2100x (índice 2) é fixo
     pass
+
+
+def get_loopback_device_index() -> int | None:
+    val = _load().get("loopback_device_index")
+    return int(val) if val is not None else None
+
+
+def save_loopback_device_index(device_index: int | None):
+    data = _load()
+    if device_index is None:
+        data.pop("loopback_device_index", None)
+    else:
+        data["loopback_device_index"] = device_index
+    _save(data)
