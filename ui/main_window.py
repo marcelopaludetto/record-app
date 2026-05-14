@@ -18,7 +18,6 @@ from ui.meeting_dialog import NewMeetingDialog
 from ui.import_dialog import ImportDialog
 from ui.tray_icon import make_tray_icon
 from ui.agent_widget import AgentWidget
-from ui.level_sampler import LevelSampler
 
 
 class MainWindow(QMainWindow):
@@ -31,8 +30,6 @@ class MainWindow(QMainWindow):
         self._timer.timeout.connect(self._update_timer)
         self._elapsed_seconds = 0
         self._notes_dir = config.NOTES_DIR
-        self._mic_sampler = LevelSampler()
-        self._loopback_sampler = LevelSampler()
         self._meter_timer = QTimer(self)
         self._meter_timer.setInterval(80)
         self._meter_timer.timeout.connect(self._update_meters)
@@ -299,25 +296,12 @@ QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
         self._label_status.setText(f"⏺  Gravando: {title}  ({audio_info})")
         self._status_bar.showMessage(f"Gravação em andamento: {title}")
         self._set_state("recording")
-
-        # Inicia medidores de nível
-        self._mic_sampler.start_mic(mic_device)
-        if loopback_device is not None:
-            from core.recorder import AudioRecorder
-            lb_devs = AudioRecorder.list_loopback_devices()
-            lb_info = next((d for d in lb_devs if d["index"] == loopback_device), None)
-            if lb_info:
-                self._loopback_sampler.start_loopback(
-                    loopback_device, lb_info["rate"], lb_info["channels"]
-                )
         self._meter_timer.start()
 
     @pyqtSlot()
     def _on_stop(self):
         self._timer.stop()
         self._meter_timer.stop()
-        self._mic_sampler.stop()
-        self._loopback_sampler.stop()
 
         self._label_status.setText("Processando...")
         self._set_state("processing")
@@ -469,8 +453,9 @@ QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
 
     @pyqtSlot()
     def _update_meters(self):
-        self._meter_mic.setValue(self._mic_sampler.level)
-        self._meter_loopback.setValue(self._loopback_sampler.level)
+        rec = self._controller._recorder
+        self._meter_mic.setValue(rec.mic_level)
+        self._meter_loopback.setValue(rec.loopback_level)
 
 # ------------------------------------------------------------------
     # System Tray

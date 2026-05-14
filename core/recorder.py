@@ -6,6 +6,7 @@ Estratégia:
 - Loopback: pyaudiowpatch (48kHz stereo → convertido para 16kHz mono)
 - Ambos gravados em paralelo, misturados no save()
 """
+import math
 import wave
 import threading
 from pathlib import Path
@@ -14,6 +15,13 @@ import numpy as np
 import sounddevice as sd
 
 from config import AUDIO_SAMPLE_RATE, DATA_DIR
+
+
+def _rms_to_level(rms: float) -> int:
+    if rms <= 0:
+        return 0
+    db = 20 * math.log10(max(rms, 1) / 32768.0)
+    return max(0, min(100, int((db + 60) / 60 * 100)))
 
 
 def _log(msg: str):
@@ -47,6 +55,8 @@ class AudioRecorder:
         self._loopback_rate: int = 48000  # será atualizado ao abrir o stream
         self._mic_rate: int = AUDIO_SAMPLE_RATE  # taxa real do mic (pode ser 48000)
         self.is_recording = False
+        self.mic_level: int = 0
+        self.loopback_level: int = 0
 
     # ------------------------------------------------------------------
     # Utilitários estáticos
@@ -130,6 +140,8 @@ class AudioRecorder:
             if not self._stop_event.is_set():
                 with self._lock:
                     self._mic_frames.append(indata.copy())
+                rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2)))
+                self.mic_level = _rms_to_level(rms)
 
         mic_device = self.mic_device
         stream_rate = self.sample_rate
@@ -161,6 +173,8 @@ class AudioRecorder:
                         if not self._stop_event.is_set():
                             with self._lock:
                                 self._mic_frames.append(indata.copy())
+                            rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2)))
+                            self.mic_level = _rms_to_level(rms)
 
                     self._mic_stream = sd.InputStream(
                         samplerate=stream_rate,
@@ -227,10 +241,11 @@ class AudioRecorder:
             while not self._stop_event.is_set():
                 data = stream.read(chunk, exception_on_overflow=False)
                 arr = np.frombuffer(data, dtype=np.int16).reshape(-1, channels)
-                # Converte para mono
                 mono = arr.mean(axis=1).astype(np.int16)
                 with self._lock:
                     self._loopback_frames.append(mono)
+                rms = float(np.sqrt(np.mean(mono.astype(np.float32) ** 2)))
+                self.loopback_level = _rms_to_level(rms)
 
             stream.stop_stream()
             stream.close()
@@ -244,6 +259,8 @@ class AudioRecorder:
 
         self._stop_event.set()
         self.is_recording = False
+        self.mic_level = 0
+        self.loopback_level = 0
 
         if self._mic_stream:
             self._mic_stream.stop()
