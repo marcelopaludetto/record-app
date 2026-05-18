@@ -1,10 +1,10 @@
 """
 Workers para operações pesadas sem bloquear a UI.
 """
-import sys
 import json
 import os
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -14,10 +14,11 @@ from config import (
     WHISPER_LANGUAGE, GROQ_API_KEY, GROQ_WHISPER_MODEL,
     TRANSCRIPTIONS_DIR, WHISPER_PROMPT,
 )
+from core.recorder import source_audio_path
 from core.transcriber import TranscriptionSegment, Transcriber
 from core.meeting_controller import MeetingController
 
-_PYTHON          = str(Path(sys.executable).parent / "python.exe")
+_PYTHON = str(Path(sys.executable).parent / "python.exe")
 _TRANSCRIBE_GROQ = str(Path(__file__).parent.parent / "core" / "transcribe_groq.py")
 
 
@@ -59,80 +60,32 @@ class ProcessingWorker(QThread):
                 self.error.emit("Nenhum áudio disponível para transcrever.")
                 return
 
-            # ----------------------------------------------------------
-            # 1. Transcrição via Groq API (subprocesso)
-            # ----------------------------------------------------------
-            self.progress.emit("Transcrevendo áudio...", 10)
-
-            audio_path = str(meeting.audio_path)
             clean_env = os.environ.copy()
             clean_env["PYTHONPATH"] = ""
             clean_env["PYTHONIOENCODING"] = "utf-8"
             clean_env["PYTHONUTF8"] = "1"
             clean_env["GROQ_API_KEY"] = GROQ_API_KEY
 
-            cmd = [_PYTHON, _TRANSCRIBE_GROQ, audio_path,
-                   GROQ_WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_PROMPT]
+            inputs = self._transcription_inputs(meeting.audio_path)
+            segments: list[TranscriptionSegment] = []
+            progress_span = max(1, 50 // len(inputs))
 
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=clean_env,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-
-            stderr_lines = []
-
-            def _read_stderr():
-                for raw_line in proc.stderr:
-                    line = raw_line.decode("utf-8", errors="replace").strip()
-                    stderr_lines.append(line)
-                    if line.startswith("PROGRESS:"):
-                        try:
-                            pct = int(line.split(":")[1])
-                            scaled = 10 + int(pct * 0.5)
-                            self.progress.emit(f"Transcrevendo... {pct}%", scaled)
-                        except ValueError:
-                            pass
-
-            stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
-            stderr_thread.start()
-
-            stdout_bytes = proc.stdout.read()
-            stdout = stdout_bytes.decode("utf-8", errors="replace")
-            stderr_thread.join()
-            proc.wait()
-
-            if proc.returncode != 0:
-                err_detail = "\n".join(stderr_lines[-5:])
-                self.error.emit(f"Falha na transcrição (código {proc.returncode}):\n{err_detail}")
-                return
-
-            # ----------------------------------------------------------
-            # 2. Parseia resultado JSON
-            # ----------------------------------------------------------
-            try:
-                raw_segments = json.loads(stdout)
-            except json.JSONDecodeError:
-                self.error.emit(f"Resultado inválido do transcritor:\n{stdout[:300]}")
-                return
-
-            if isinstance(raw_segments, dict) and "error" in raw_segments:
-                self.error.emit(raw_segments["error"])
-                return
-
-            segments = [
-                TranscriptionSegment(
-                    start=s["start"],
-                    end=s["end"],
-                    text=s["text"],
+            for index, (speaker, audio_path) in enumerate(inputs):
+                progress_start = 10 + index * progress_span
+                segments.extend(
+                    self._transcribe_audio(
+                        audio_path=audio_path,
+                        speaker=speaker,
+                        clean_env=clean_env,
+                        progress_start=progress_start,
+                        progress_span=progress_span,
+                    )
                 )
-                for s in raw_segments
-            ]
+
+            segments.sort(key=lambda s: (s.start, s.end))
 
             # ----------------------------------------------------------
-            # 3. Salva transcrição no meeting atual via controller
+            # Salva transcrição no meeting atual via controller
             # ----------------------------------------------------------
             transcriber = Transcriber()
             transcript_text = transcriber.segments_to_text(segments)
@@ -148,16 +101,19 @@ class ProcessingWorker(QThread):
             meeting.transcript_path = txt_path
             meeting.status = "summarizing"
 
-            self.progress.emit(f"Transcrição concluída ({len(segments)} segmentos). Gerando resumo...", 65)
+            self.progress.emit(
+                f"Transcrição concluída ({len(segments)} segmentos). Gerando resumo...",
+                65,
+            )
 
             # ----------------------------------------------------------
-            # 4. Sumarização via Claude
+            # Sumarização
             # ----------------------------------------------------------
             self._controller.summarize_current()
             self.progress.emit("Resumo gerado. Exportando documento...", 90)
 
             # ----------------------------------------------------------
-            # 5. Exportação
+            # Exportação
             # ----------------------------------------------------------
             path = self._controller.export_current()
             self.progress.emit("Documento salvo!", 100)
@@ -166,3 +122,105 @@ class ProcessingWorker(QThread):
         except Exception as exc:
             import traceback
             self.error.emit(f"{exc}\n\n{traceback.format_exc()}")
+
+    def _transcription_inputs(self, audio_path: Path) -> list[tuple[str, Path]]:
+        mic_path = source_audio_path(audio_path, "mic")
+        system_path = source_audio_path(audio_path, "system")
+
+        inputs: list[tuple[str, Path]] = []
+        if mic_path.exists():
+            inputs.append(("mic", mic_path))
+        if system_path.exists():
+            inputs.append(("system", system_path))
+
+        if inputs:
+            return inputs
+        return [("", audio_path)]
+
+    def _transcribe_audio(
+        self,
+        audio_path: Path,
+        speaker: str,
+        clean_env: dict[str, str],
+        progress_start: int,
+        progress_span: int,
+    ) -> list[TranscriptionSegment]:
+        label = _progress_label(speaker)
+        self.progress.emit(f"Transcrevendo {label}...", progress_start)
+
+        cmd = [
+            _PYTHON,
+            _TRANSCRIBE_GROQ,
+            str(audio_path),
+            GROQ_WHISPER_MODEL,
+            WHISPER_LANGUAGE,
+            WHISPER_PROMPT,
+        ]
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=clean_env,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+
+        stderr_lines: list[str] = []
+
+        def _read_stderr():
+            if proc.stderr is None:
+                return
+            for raw_line in proc.stderr:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                stderr_lines.append(line)
+                if line.startswith("PROGRESS:"):
+                    try:
+                        pct = int(line.split(":")[1])
+                        scaled = progress_start + int(pct * progress_span / 100)
+                        self.progress.emit(f"Transcrevendo {label}... {pct}%", scaled)
+                    except ValueError:
+                        pass
+
+        stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
+        stderr_thread.start()
+
+        if proc.stdout is None:
+            raise RuntimeError("Falha ao capturar saída do transcritor.")
+        stdout_bytes = proc.stdout.read()
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
+        stderr_thread.join()
+        proc.wait()
+
+        if proc.returncode != 0:
+            err_detail = "\n".join(stderr_lines[-5:])
+            raise RuntimeError(
+                f"Falha na transcrição de {label} (código {proc.returncode}):\n{err_detail}"
+            )
+
+        try:
+            raw_segments = json.loads(stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Resultado inválido do transcritor:\n{stdout[:300]}") from exc
+
+        if isinstance(raw_segments, dict) and "error" in raw_segments:
+            raise RuntimeError(raw_segments["error"])
+        if not isinstance(raw_segments, list):
+            raise RuntimeError(f"Resultado inesperado do transcritor:\n{stdout[:300]}")
+
+        return [
+            TranscriptionSegment(
+                start=s["start"],
+                end=s["end"],
+                text=s["text"],
+                speaker=speaker,
+            )
+            for s in raw_segments
+        ]
+
+
+def _progress_label(speaker: str) -> str:
+    if speaker == "mic":
+        return "microfone"
+    if speaker == "system":
+        return "áudio do sistema"
+    return "áudio"

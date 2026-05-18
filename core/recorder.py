@@ -283,21 +283,19 @@ class AudioRecorder:
             )
 
         # Resample mic se foi gravado a taxa diferente
-        if self._mic_rate != self.sample_rate:
-            ratio = self.sample_rate / self._mic_rate
-            new_len = int(len(mic_audio) * ratio)
-            indices = np.linspace(0, len(mic_audio) - 1, new_len)
-            mic_audio = np.interp(indices, np.arange(len(mic_audio)), mic_audio).astype(np.int16)
+        mic_audio = _resample_audio(mic_audio, self._mic_rate, self.sample_rate)
 
         # Mistura mic + loopback (se disponível)
         mixed = _mix_audio(mic_audio, loopback_raw, self._loopback_rate, self.sample_rate)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(output_path), "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(self.sample_rate)
-            wf.writeframes(mixed.tobytes())
+        _write_wav(output_path, mixed, self.sample_rate)
+
+        # Sidecars usados para transcrever com rótulos compactos: eu/outros.
+        _write_wav(source_audio_path(output_path, "mic"), mic_audio, self.sample_rate)
+        if loopback_raw is not None and len(loopback_raw) > 0:
+            loopback_audio = _resample_audio(loopback_raw, self._loopback_rate, self.sample_rate)
+            _write_wav(source_audio_path(output_path, "system"), loopback_audio, self.sample_rate)
 
         return output_path
 
@@ -316,20 +314,47 @@ def _mix_audio(mic: np.ndarray, loopback: np.ndarray | None,
     if loopback is None or len(loopback) == 0:
         return mic.astype(np.int16)
 
-    # Reamostrar loopback: 48kHz → 16kHz
-    if loopback_rate != target_rate:
-        ratio = target_rate / loopback_rate
-        new_len = int(len(loopback) * ratio)
-        indices = np.linspace(0, len(loopback) - 1, new_len)
-        loopback_resampled = np.interp(indices, np.arange(len(loopback)), loopback).astype(np.int16)
-    else:
-        loopback_resampled = loopback.astype(np.int16)
+    loopback_resampled = _resample_audio(loopback, loopback_rate, target_rate)
 
     # Iguala tamanhos
-    min_len = min(len(mic), len(loopback_resampled))
-    mic_trim = mic[:min_len].astype(np.int32)
-    loop_trim = loopback_resampled[:min_len].astype(np.int32)
+    target_len = max(len(mic), len(loopback_resampled))
+    mic_trim = _pad_or_trim(mic, target_len).astype(np.int32)
+    loop_trim = _pad_or_trim(loopback_resampled, target_len).astype(np.int32)
 
     # Mistura com clipping (evita overflow)
     mixed = np.clip(mic_trim + loop_trim, -32768, 32767).astype(np.int16)
     return mixed
+
+
+def source_audio_path(output_path: Path, source: str) -> Path:
+    suffix = {
+        "mic": "_mic",
+        "system": "_system",
+    }[source]
+    return output_path.with_name(f"{output_path.stem}{suffix}{output_path.suffix}")
+
+
+def _resample_audio(audio: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
+    if source_rate == target_rate or len(audio) == 0:
+        return audio.astype(np.int16)
+
+    ratio = target_rate / source_rate
+    new_len = max(1, int(len(audio) * ratio))
+    indices = np.linspace(0, len(audio) - 1, new_len)
+    return np.interp(indices, np.arange(len(audio)), audio).astype(np.int16)
+
+
+def _pad_or_trim(audio: np.ndarray, target_len: int) -> np.ndarray:
+    if len(audio) == target_len:
+        return audio
+    if len(audio) > target_len:
+        return audio[:target_len]
+    return np.pad(audio, (0, target_len - len(audio)), mode="constant")
+
+
+def _write_wav(path: Path, audio: np.ndarray, sample_rate: int):
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(audio.astype(np.int16).tobytes())
