@@ -16,6 +16,7 @@ from core.meeting_controller import MeetingController
 from ui.workers import ProcessingWorker, TxtProcessingWorker
 from ui.meeting_dialog import NewMeetingDialog
 from ui.import_dialog import ImportDialog
+from ui.personal_terms_dialog import PersonalTermsDialog
 from ui.tray_icon import make_tray_icon
 from ui.agent_widget import AgentWidget
 
@@ -205,6 +206,12 @@ QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
         self._btn_obsidian.clicked.connect(self._open_in_obsidian)
         import_row.addWidget(self._btn_obsidian)
 
+        self._btn_terms = QPushButton("Termos")
+        self._btn_terms.setObjectName("btn_secondary")
+        self._btn_terms.setFixedHeight(32)
+        self._btn_terms.clicked.connect(self._on_personal_terms)
+        import_row.addWidget(self._btn_terms)
+
         layout.addLayout(import_row)
         layout.addSpacing(8)
 
@@ -250,6 +257,7 @@ QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
 
         self._btn_import.setEnabled(idle or done or error)
         self._btn_import_txt.setEnabled(idle or done or error)
+        self._btn_terms.setEnabled(not processing)
 
         self._label_timer.setVisible(recording)
         self._meters_widget.setVisible(recording)
@@ -617,6 +625,12 @@ QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
         import urllib.parse
         encoded = urllib.parse.quote(str(self._notes_dir), safe="")
         os.startfile(f"obsidian://open?path={encoded}")
+
+    @pyqtSlot()
+    def _on_personal_terms(self):
+        dlg = PersonalTermsDialog(parent=self)
+        if dlg.exec() == PersonalTermsDialog.DialogCode.Accepted:
+            self._status_bar.showMessage("Termos de transcrição atualizados.")
 
 
 class _ApiPingThread(QThread):

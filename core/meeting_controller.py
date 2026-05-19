@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import config
 from config import AUDIO_DIR, MIC_DEVICE_INDEX, SUMMARIZER_BACKEND, NOTES_DIR, NAME_ALIASES
 from core.recorder import AudioRecorder
 from core.summarizer import Summarizer
@@ -109,6 +110,7 @@ class MeetingController:
         if not self._current or not self._current.transcript_text:
             raise RuntimeError("Sem transcrição para sumarizar.")
 
+        config.reload_personal_terms()
         plain = _plain_from_transcript(self._current.transcript_text)
         result = None
         try:

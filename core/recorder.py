@@ -6,6 +6,7 @@ Estratégia:
 - Loopback: pyaudiowpatch (48kHz stereo → convertido para 16kHz mono)
 - Ambos gravados em paralelo, misturados no save()
 """
+import json
 import math
 import wave
 import threading
@@ -286,16 +287,19 @@ class AudioRecorder:
         mic_audio = _resample_audio(mic_audio, self._mic_rate, self.sample_rate)
 
         # Mistura mic + loopback (se disponível)
-        mixed = _mix_audio(mic_audio, loopback_raw, self._loopback_rate, self.sample_rate)
+        loopback_audio = (
+            _resample_audio(loopback_raw, self._loopback_rate, self.sample_rate)
+            if loopback_raw is not None and len(loopback_raw) > 0
+            else None
+        )
+        mixed = _mix_audio(mic_audio, loopback_audio)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         _write_wav(output_path, mixed, self.sample_rate)
 
-        # Sidecars usados para transcrever com rótulos compactos: eu/outros.
-        _write_wav(source_audio_path(output_path, "mic"), mic_audio, self.sample_rate)
-        if loopback_raw is not None and len(loopback_raw) > 0:
-            loopback_audio = _resample_audio(loopback_raw, self._loopback_rate, self.sample_rate)
-            _write_wav(source_audio_path(output_path, "system"), loopback_audio, self.sample_rate)
+        # Metadados leves para rotular os segmentos depois de uma unica chamada Groq.
+        if loopback_audio is not None and len(loopback_audio) > 0:
+            _write_source_activity(output_path, mic_audio, loopback_audio, self.sample_rate)
 
         return output_path
 
@@ -308,30 +312,23 @@ class AudioRecorder:
 # Mixagem de áudio
 # ------------------------------------------------------------------
 
-def _mix_audio(mic: np.ndarray, loopback: np.ndarray | None,
-               loopback_rate: int, target_rate: int) -> np.ndarray:
-    """Reamostrar loopback para target_rate e misturar com mic."""
+def _mix_audio(mic: np.ndarray, loopback: np.ndarray | None) -> np.ndarray:
+    """Mistura microfone e loopback ja reamostrados para a mesma taxa."""
     if loopback is None or len(loopback) == 0:
         return mic.astype(np.int16)
 
-    loopback_resampled = _resample_audio(loopback, loopback_rate, target_rate)
-
     # Iguala tamanhos
-    target_len = max(len(mic), len(loopback_resampled))
+    target_len = max(len(mic), len(loopback))
     mic_trim = _pad_or_trim(mic, target_len).astype(np.int32)
-    loop_trim = _pad_or_trim(loopback_resampled, target_len).astype(np.int32)
+    loop_trim = _pad_or_trim(loopback, target_len).astype(np.int32)
 
     # Mistura com clipping (evita overflow)
     mixed = np.clip(mic_trim + loop_trim, -32768, 32767).astype(np.int16)
     return mixed
 
 
-def source_audio_path(output_path: Path, source: str) -> Path:
-    suffix = {
-        "mic": "_mic",
-        "system": "_system",
-    }[source]
-    return output_path.with_name(f"{output_path.stem}{suffix}{output_path.suffix}")
+def source_activity_path(output_path: Path) -> Path:
+    return output_path.with_name(f"{output_path.stem}_sources.json")
 
 
 def _resample_audio(audio: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
@@ -358,3 +355,40 @@ def _write_wav(path: Path, audio: np.ndarray, sample_rate: int):
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
         wf.writeframes(audio.astype(np.int16).tobytes())
+
+
+def _write_source_activity(
+    output_path: Path,
+    mic: np.ndarray,
+    loopback: np.ndarray,
+    sample_rate: int,
+    bin_seconds: float = 0.5,
+):
+    target_len = max(len(mic), len(loopback))
+    mic = _pad_or_trim(mic, target_len).astype(np.float32)
+    loopback = _pad_or_trim(loopback, target_len).astype(np.float32)
+    frame_len = max(1, int(sample_rate * bin_seconds))
+
+    mic_levels: list[int] = []
+    system_levels: list[int] = []
+
+    for start in range(0, target_len, frame_len):
+        end = min(start + frame_len, target_len)
+        mic_frame = mic[start:end]
+        system_frame = loopback[start:end]
+        mic_rms = float(np.sqrt(np.mean(mic_frame ** 2))) if len(mic_frame) else 0.0
+        system_rms = float(np.sqrt(np.mean(system_frame ** 2))) if len(system_frame) else 0.0
+        mic_levels.append(int(round(mic_rms)))
+        system_levels.append(int(round(system_rms)))
+
+    payload = {
+        "version": 1,
+        "sample_rate": sample_rate,
+        "bin_seconds": bin_seconds,
+        "mic": mic_levels,
+        "system": system_levels,
+    }
+    source_activity_path(output_path).write_text(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )

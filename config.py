@@ -27,12 +27,47 @@ for _dir in [AUDIO_DIR, TRANSCRIPTIONS_DIR, NOTES_DIR]:
 GROQ_API_KEY       = os.getenv("GROQ_API_KEY", "")
 GROQ_WHISPER_MODEL = "whisper-large-v3-turbo"  # whisper-large-v3-turbo | whisper-large-v3 | distil-whisper-large-v3-en
 WHISPER_LANGUAGE   = "pt"
-_PERSONAL_TERMS = {}
-if PERSONAL_TERMS_PATH.exists():
+def load_personal_terms() -> dict:
+    if not PERSONAL_TERMS_PATH.exists():
+        return {"whisper_prompt": "", "name_aliases": {}}
     try:
-        _PERSONAL_TERMS = json.loads(PERSONAL_TERMS_PATH.read_text(encoding="utf-8"))
+        data = json.loads(PERSONAL_TERMS_PATH.read_text(encoding="utf-8"))
     except Exception:
-        _PERSONAL_TERMS = {}
+        return {"whisper_prompt": "", "name_aliases": {}}
+    if not isinstance(data, dict):
+        return {"whisper_prompt": "", "name_aliases": {}}
+    data.setdefault("whisper_prompt", "")
+    data.setdefault("name_aliases", {})
+    if not isinstance(data["name_aliases"], dict):
+        data["name_aliases"] = {}
+    return data
+
+
+def save_personal_terms(data: dict):
+    PERSONAL_TERMS_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    reload_personal_terms()
+
+
+def reload_personal_terms():
+    global _PERSONAL_TERMS, WHISPER_PROMPT
+    _PERSONAL_TERMS = load_personal_terms()
+    WHISPER_PROMPT = str(_PERSONAL_TERMS.get("whisper_prompt", ""))
+    NAME_ALIASES.clear()
+    NAME_ALIASES.update({
+        str(alias): str(canonical)
+        for alias, canonical in (_PERSONAL_TERMS.get("name_aliases") or {}).items()
+    })
+
+
+def get_whisper_prompt() -> str:
+    reload_personal_terms()
+    return WHISPER_PROMPT
+
+
+_PERSONAL_TERMS = load_personal_terms()
 
 # Contexto enviado ao Whisper/Groq para orientar idioma, grafias e termos recorrentes.
 # Isto é uma dica de transcrição, não uma regra rígida. Configure termos pessoais em

@@ -192,6 +192,85 @@ QTextEdit {
     selection-background-color: #45475a;
 }
 
+/* Tabelas */
+QTableWidget, QTableView {
+    background-color: #181825;
+    alternate-background-color: #222236;
+    color: #cdd6f4;
+    border: 1px solid #313244;
+    border-radius: 8px;
+    gridline-color: #313244;
+    selection-background-color: #313244;
+    selection-color: #ffffff;
+}
+
+QTableWidget::item, QTableView::item {
+    padding: 6px 8px;
+    border: none;
+}
+
+QTableWidget::item:selected, QTableView::item:selected {
+    background-color: #45475a;
+    color: #ffffff;
+}
+
+QTableWidget::item:hover, QTableView::item:hover {
+    background-color: #2a2b3e;
+}
+
+QHeaderView {
+    background-color: #181825;
+}
+
+QHeaderView::section {
+    background-color: #313244;
+    color: #bac2de;
+    border: none;
+    border-right: 1px solid #45475a;
+    border-bottom: 1px solid #45475a;
+    padding: 7px 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QTableCornerButton::section {
+    background-color: #313244;
+    border: none;
+}
+
+QAbstractItemView {
+    outline: none;
+}
+
+QAbstractItemView::item:focus {
+    border: none;
+    outline: none;
+}
+
+/* Checkboxes */
+QCheckBox {
+    spacing: 6px;
+    color: #cdd6f4;
+    font-size: 13px;
+}
+
+QCheckBox::indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    border: 1px solid #6c7086;
+    background-color: #313244;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #89b4fa;
+    border-color: #89b4fa;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #89b4fa;
+}
+
 QLineEdit {
     background-color: #313244;
     border: 1px solid #45475a;

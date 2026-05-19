@@ -10,11 +10,12 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+import config
 from config import (
     WHISPER_LANGUAGE, GROQ_API_KEY, GROQ_WHISPER_MODEL,
-    TRANSCRIPTIONS_DIR, WHISPER_PROMPT,
+    TRANSCRIPTIONS_DIR,
 )
-from core.recorder import source_audio_path
+from core.recorder import source_activity_path
 from core.transcriber import TranscriptionSegment, Transcriber
 from core.meeting_controller import MeetingController
 
@@ -66,28 +67,23 @@ class ProcessingWorker(QThread):
             clean_env["PYTHONUTF8"] = "1"
             clean_env["GROQ_API_KEY"] = GROQ_API_KEY
 
-            inputs = self._transcription_inputs(meeting.audio_path)
-            segments: list[TranscriptionSegment] = []
-            progress_span = max(1, 50 // len(inputs))
-
-            for index, (speaker, audio_path) in enumerate(inputs):
-                progress_start = 10 + index * progress_span
-                segments.extend(
-                    self._transcribe_audio(
-                        audio_path=audio_path,
-                        speaker=speaker,
-                        clean_env=clean_env,
-                        progress_start=progress_start,
-                        progress_span=progress_span,
-                    )
-                )
-
+            segments = self._transcribe_audio(
+                audio_path=meeting.audio_path,
+                clean_env=clean_env,
+                progress_start=10,
+                progress_span=50,
+            )
             segments.sort(key=lambda s: (s.start, s.end))
 
             # ----------------------------------------------------------
             # Salva transcrição no meeting atual via controller
             # ----------------------------------------------------------
             transcriber = Transcriber()
+            activity_path = source_activity_path(meeting.audio_path)
+            transcriber.label_segments_from_source_activity(
+                segments,
+                activity_path,
+            )
             transcript_text = transcriber.segments_to_text(segments)
 
             meeting.transcript_text = transcript_text
@@ -98,6 +94,7 @@ class ProcessingWorker(QThread):
             date_str = meeting.started_at.strftime("%Y-%m-%d_%H-%M")
             txt_path = TRANSCRIPTIONS_DIR / f"{date_str}_{safe}.txt"
             txt_path.write_text(transcript_text, encoding="utf-8")
+            _delete_if_exists(activity_path)
             meeting.transcript_path = txt_path
             meeting.status = "summarizing"
 
@@ -123,30 +120,14 @@ class ProcessingWorker(QThread):
             import traceback
             self.error.emit(f"{exc}\n\n{traceback.format_exc()}")
 
-    def _transcription_inputs(self, audio_path: Path) -> list[tuple[str, Path]]:
-        mic_path = source_audio_path(audio_path, "mic")
-        system_path = source_audio_path(audio_path, "system")
-
-        inputs: list[tuple[str, Path]] = []
-        if mic_path.exists():
-            inputs.append(("mic", mic_path))
-        if system_path.exists():
-            inputs.append(("system", system_path))
-
-        if inputs:
-            return inputs
-        return [("", audio_path)]
-
     def _transcribe_audio(
         self,
         audio_path: Path,
-        speaker: str,
         clean_env: dict[str, str],
         progress_start: int,
         progress_span: int,
     ) -> list[TranscriptionSegment]:
-        label = _progress_label(speaker)
-        self.progress.emit(f"Transcrevendo {label}...", progress_start)
+        self.progress.emit("Transcrevendo áudio...", progress_start)
 
         cmd = [
             _PYTHON,
@@ -154,7 +135,7 @@ class ProcessingWorker(QThread):
             str(audio_path),
             GROQ_WHISPER_MODEL,
             WHISPER_LANGUAGE,
-            WHISPER_PROMPT,
+            config.get_whisper_prompt(),
         ]
 
         proc = subprocess.Popen(
@@ -177,7 +158,7 @@ class ProcessingWorker(QThread):
                     try:
                         pct = int(line.split(":")[1])
                         scaled = progress_start + int(pct * progress_span / 100)
-                        self.progress.emit(f"Transcrevendo {label}... {pct}%", scaled)
+                        self.progress.emit(f"Transcrevendo áudio... {pct}%", scaled)
                     except ValueError:
                         pass
 
@@ -194,7 +175,7 @@ class ProcessingWorker(QThread):
         if proc.returncode != 0:
             err_detail = "\n".join(stderr_lines[-5:])
             raise RuntimeError(
-                f"Falha na transcrição de {label} (código {proc.returncode}):\n{err_detail}"
+                f"Falha na transcrição (código {proc.returncode}):\n{err_detail}"
             )
 
         try:
@@ -212,15 +193,13 @@ class ProcessingWorker(QThread):
                 start=s["start"],
                 end=s["end"],
                 text=s["text"],
-                speaker=speaker,
             )
             for s in raw_segments
         ]
 
 
-def _progress_label(speaker: str) -> str:
-    if speaker == "mic":
-        return "microfone"
-    if speaker == "system":
-        return "áudio do sistema"
-    return "áudio"
+def _delete_if_exists(path: Path):
+    try:
+        path.unlink()
+    except OSError:
+        pass
